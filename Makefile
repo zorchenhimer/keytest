@@ -1,12 +1,15 @@
 .PHONY: default env clean cleanall chr
 
 CHRUTIL = go-nes/bin/chrutil
+SCRCONV = convert-screen.go
 NAME = keytest
 NESCFG = nes_nrom.cfg
 CAFLAGS = -g -t nes
 LDFLAGS = -C $(NESCFG) --dbgfile bin/$(NAME).dbg -m bin/$(NAME).map
 
-SOURCES = main.asm
+SOURCES = main.asm \
+		  controller.i \
+		  keyboard.i
 CHR = font.chr
 
 default: env bin/$(NAME).nes
@@ -31,6 +34,12 @@ images/%.bmp: images/%.aseprite
 
 font.chr: images/font.bmp
 	$(CHRUTIL) -o $@ $<
+
+controller.i: images/controller.tmx $(SCRCONV)
+	go run convert-screen.go $< $@ --fill 32
+
+keyboard.i: images/keyboard.tmx $(SCRCONV)
+	go run convert-screen.go $< $@ --layer main --fill 32
 
 $(CHRUTIL):
 	$(MAKE) -C go-nes/ bin/chrutil$(EXT)

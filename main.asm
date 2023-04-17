@@ -22,17 +22,28 @@ btnX: .res 1
 btnY: .res 1
 
 AddressPointer: .res 2
+AddressPointer2: .res 2
 MenuSelection: .res 1
+
+controllers:            .res 4 ; buttons currently pressed
+controllers_pressed:    .res 4 ; buttons pressed this frame
+controllers_released:   .res 4 ; buttons pressed this frame
+controllers_old:        .res 4 ; last frame's buttons
+
+BufferIndex:    .res 1  ; doubles as size; $FF = empty
+Buffer_AddrLo:  .res 72
+Buffer_AddrHi:  .res 72
+Buffer_Data:     .res 72
 
 .segment "OAM"
 SpriteZero: .res 4
 Sprites: .res (64*4)-4
 .segment "BSS"
 
-controller1:        .res 1
-controller2:        .res 1
-controller1_old:    .res 1
-controller2_old:    .res 1
+Controller1_Lookup: .res 16
+Controller2_Lookup: .res 16
+Controller3_Lookup: .res 16
+Controller4_Lookup: .res 16
 
 .segment "VECTORS"
     .word NMI
@@ -60,6 +71,10 @@ IRQ:
 
 NMI:
     pha
+    txa
+    pha
+    tya
+    pha
 
     lda #$FF
     sta Sleeping
@@ -69,6 +84,39 @@ NMI:
     lda #$02
     sta $4014
 
+    lda BufferIndex
+    bmi @emptyBuffer
+    tax
+    lda UnrolledLookup_lo, x
+    sta AddressPointer+0
+    lda UnrolledLookup_hi, x
+    sta AddressPointer+1
+    jmp (AddressPointer)
+
+;    ldy #48 ; max updates per frame
+;
+;@bufferLoop:
+;    lda Buffer_AddrHi, x
+;    sta $2006
+;    lda Buffer_AddrLo, x
+;    sta $2006
+;    lda Buffer_Data, x
+;    sta $2007
+;    dex
+;    bmi @buffDone
+;    dey
+;    bne @bufferLoop ; wait until the next frame to finish
+;
+;@buffWait:
+;    stx BufferIndex
+;    jmp @emptyBuffer
+;
+;@buffDone:
+;    lda #$FF
+;    sta BufferIndex
+;
+@emptyBuffer:
+
     lda #0
     sta $2005
     sta $2005
@@ -77,75 +125,138 @@ NMI:
     sta $2000
 
     pla
+    tay
+    pla
+    tax
+    pla
+    rti
+
+UnrolledLookup_hi:
+    .repeat 72, i
+    .byte .hibyte(.ident(.sprintf("ul_%02d", i)))
+    .endrepeat
+
+UnrolledLookup_lo:
+    .repeat 72, i
+    .byte .lobyte(.ident(.sprintf("ul_%02d", i)))
+    .endrepeat
+
+UnrolledLoop:
+    .repeat 72, i
+    .ident( .sprintf("ul_%02d", (72-i-1))):
+    ;.out .sprintf("ul_%02d", (72-i-1))
+    lda Buffer_AddrHi+(72-i-1)
+    sta $2006
+    lda Buffer_AddrLo+(72-i-1)
+    sta $2006
+    lda Buffer_Data+(72-i-1)
+    sta $2007
+    .endrepeat
+
+    lda #0
+    sta $2005
+    sta $2005
+
+    lda #%1000_0000
+    sta $2000
+
+    pla
+    tay
+    pla
+    tax
+    pla
     rti
 
 ReadControllers:
-    lda controller1
-    sta controller1_old
-
-    lda controller2
-    sta controller2_old
-
     ; Freeze input
     lda #1
     sta $4016
     lda #0
     sta $4016
 
-    LDX #$08
+    ldx #0
+    ldy #8
+    lda controllers, x
+    sta controllers_old, x
 @player1:
     lda $4016
-    lsr A           ; Bit0 -> Carry
-    rol controller1 ; Bit0 <- Carry
-    dex
+    lsr A              ; Bit0 -> Carry
+    rol controllers, x ; Bit0 <- Carry
+    dey
     bne @player1
 
-    ldx #$08
+    lda controllers, x
+    eor controllers_old, x
+    and controllers, x
+    sta controllers_pressed, x
+
+    lda controllers, x
+    eor controllers_old, x
+    and controllers_old, x
+    sta controllers_released, x
+
+    inx
+    ldy #8
+    lda controllers, x
+    sta controllers_old, x
+@player3:
+    lda $4016
+    lsr A              ; Bit0 -> Carry
+    rol controllers, x ; Bit0 <- Carry
+    dey
+    bne @player3
+
+    lda controllers, x
+    eor controllers_old, x
+    and controllers, x
+    sta controllers_pressed, x
+
+    lda controllers, x
+    eor controllers_old, x
+    and controllers_old, x
+    sta controllers_released, x
+
+    inx
+    lda controllers, x
+    sta controllers_old, x
+    ldy #8
 @player2:
     lda $4017
-    lsr A           ; Bit0 -> Carry
-    rol controller2 ; Bit0 <- Carry
-    dex
+    lsr A              ; Bit0 -> Carry
+    rol controllers, x ; Bit0 <- Carry
+    dey
     bne @player2
-    rts
 
-ButtonPressedP1:
-    sta btnX
-    and controller1
-    sta btnY
+    lda controllers, x
+    eor controllers_old, x
+    and controllers, x
+    sta controllers_pressed, x
 
-    lda controller1_old
-    and btnX
+    lda controllers, x
+    eor controllers_old, x
+    and controllers_old, x
+    sta controllers_released, x
 
-    cmp btnY
-    bne btnPress_stb
+    inx
+    lda controllers, x
+    sta controllers_old, x
+    ldy #8
+@player4:
+    lda $4017
+    lsr A              ; Bit0 -> Carry
+    rol controllers, x ; Bit0 <- Carry
+    dey
+    bne @player4
 
-    ; no button change
-    rts
+    lda controllers, x
+    eor controllers_old, x
+    and controllers, x
+    sta controllers_pressed, x
 
-ButtonPressedP2:
-    sta btnX
-    and controller2
-    sta btnY
-
-    lda controller2_old
-    and btnX
-
-    cmp btnY
-    bne btnPress_stb
-
-    ; no button change
-    rts
-
-btnPress_stb:
-    ; button released
-    lda btnY
-    bne btnPress_stc
-    rts
-
-btnPress_stc:
-    ; button pressed
-    lda #1
+    lda controllers, x
+    eor controllers_old, x
+    and controllers_old, x
+    sta controllers_released, x
     rts
 
 ReadKeyboard:
@@ -321,6 +432,9 @@ RESET:
     cpx #32
     bne :-
 
+    lda #$FF
+    sta BufferIndex
+
     lda #%1000_0000
     sta $2000
 
@@ -336,6 +450,22 @@ RESET:
     jsr ClearScreen
     jsr DrawMenu
 
+;    ; Fill up the draw buffer with some data
+;    ldy #$00
+;    ldx #72
+;:
+;    lda #$20
+;    sta Buffer_AddrHi, y
+;    stx Buffer_AddrLo, y
+;    ;lda #$A0
+;    stx Buffer_Data, y
+;    iny
+;    dex
+;    bne :-
+;
+;    lda #71
+;    sta BufferIndex
+
     jsr WaitForNMI
 
     lda #%0001_1110
@@ -345,7 +475,7 @@ Frame_Menu:
     jsr ReadControllers
 
     lda #BUTTON_DOWN
-    jsr ButtonPressedP1
+    and controllers_pressed
     beq :+
     inc MenuSelection
     lda MenuSelection
@@ -355,7 +485,7 @@ Frame_Menu:
     sta MenuSelection
 :
     lda #BUTTON_UP
-    jsr ButtonPressedP1
+    and controllers_pressed
     beq :+
     dec MenuSelection
     lda MenuSelection
@@ -365,7 +495,7 @@ Frame_Menu:
 :
 
     lda #BUTTON_A
-    jsr ButtonPressedP1
+    and controllers_pressed
     beq :+
     jsr WaitForNMI
     lda MenuSelection
@@ -387,6 +517,7 @@ Frame_Menu:
     lda MenuRows+1, x
     sta SpriteZero+3
 
+    jsr WaitForNMI
     jmp Frame_Menu
 
 ControllerLabels:
@@ -397,15 +528,74 @@ ControllerLabels:
 
 ControllerLabelAddrs:
     .word $2084
-    .word $2090
+    .word $2093
     .word $2204
-    .word $2210
-
-ControllerTiles:
-    ;.byte 
+    .word $2213
 
 DrawController:
     ; Start address in AddressPointer
+    lda AddressPointer+1
+    sta $2006
+    lda AddressPointer+0
+    sta $2006
+
+    ldx #2
+    lda ControllerTiles, x
+    tay ; width
+    sta TmpX
+    inx
+    lda ControllerTiles, x
+    sta TmpY ; height
+    inx
+
+@loop:
+    lda ControllerTiles, x
+    sta $2007
+    inx
+    dey
+    bne @loop
+
+    ; next row
+    clc
+    lda AddressPointer+0
+    adc #$20
+    sta AddressPointer+0
+    lda AddressPointer+1
+    adc #0
+    sta AddressPointer+1
+    sta $2006
+    lda AddressPointer+0
+    sta $2006
+
+    lda TmpX
+    tay
+    dec TmpY
+    bne @loop
+    rts
+
+LoadControllerLookup:
+    ; Start ppu addr in AddressPointer2
+    ; RAM table addr in AddressPointer
+    ldx #0
+    ldy #0
+    lda #8
+    sta TmpX
+@loop:
+    clc
+    lda ControllerButtonData, x
+    adc AddressPointer2+0
+    adc #$40
+    sta (AddressPointer), y
+    iny
+    lda AddressPointer2+1
+    adc #0
+    sta (AddressPointer), y
+    iny
+    inx
+
+    dec TmpX
+    bne @loop
+    rts
 
 Init_Controllers:
 
@@ -424,8 +614,12 @@ Init_Controllers:
     ldy #0
 @txtStart:
     lda ControllerLabelAddrs+1, x
+    sta AddressPointer+1
+    sta AddressPointer2+1
     sta $2006
     lda ControllerLabelAddrs+0, x
+    sta AddressPointer+0
+    sta AddressPointer2+0
     sta $2006
 
 @txtLoop:
@@ -436,6 +630,38 @@ Init_Controllers:
     jmp @txtLoop
 
 @next:
+
+    tya
+    pha
+    txa
+    pha
+
+    ; draw controller
+    clc
+    lda AddressPointer+0
+    adc #$40
+    sta AddressPointer+0
+    lda AddressPointer+1
+    adc #0
+    sta AddressPointer+1
+    jsr DrawController
+
+    pla
+    pha
+    tax
+
+    ; Populate lookup table
+    lda ControllerLookupLookup+0, x
+    sta AddressPointer+0
+    lda ControllerLookupLookup+1, x
+    sta AddressPointer+1
+    jsr LoadControllerLookup
+
+    pla
+    tax
+    pla
+    tay
+
     iny
     inx
     inx
@@ -478,7 +704,6 @@ MenuDestinations:
 
 Palettes:
     ; BG
-    ; Sprite
     .byte $0F, $20, $10, $00
     .byte $0F, $20, $10, $00
     .byte $0F, $20, $10, $00
@@ -489,3 +714,31 @@ Palettes:
     .byte $0F, $20, $10, $00
     .byte $0F, $20, $10, $00
     .byte $0F, $20, $10, $00
+
+.enum ControllerData
+Btn_A
+Btn_B
+Btn_Select
+Btn_Start
+Btn_Up
+Btn_Down
+Btn_Left
+Btn_Right
+.endenum
+
+ControllerButtonData:
+    .byte (1*32+8), (1*32+7), (1*32+4), (1*32+5)
+    .byte (0*32+1), (2*32+1), (1*32+0), (1*32+2)
+    ;.byte 18, 17, 14, 15, 1, 20, 10, 12
+
+ControllerLookupLookup:
+    .word Controller1_Lookup
+    .word Controller2_Lookup
+    .word Controller3_Lookup
+    .word Controller4_Lookup
+
+ControllerTiles:
+    .include "controller.i"
+
+KeyboardTiles:
+    .include "keyboard.i"
