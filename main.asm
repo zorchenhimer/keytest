@@ -12,22 +12,43 @@ nes2end
 .feature underline_in_numbers
 .feature addrsize
 
+TRUE = 1
+FALSE = 0
+
+DEBUG_CONTROLLER_LAYOUT = FALSE
+
+.enum ControllerData
+Btn_A
+Btn_B
+Btn_Select
+Btn_Start
+Btn_Up
+Btn_Down
+Btn_Left
+Btn_Right
+.endenum
+
+
 .segment "ZEROPAGE"
 Sleeping: .res 1
 
 TmpX: .res 1
 TmpY: .res 1
+TmpZ: .res 1
 
 btnX: .res 1
 btnY: .res 1
 
 AddressPointer: .res 2
 AddressPointer2: .res 2
+AddressPointer3: .res 2
 MenuSelection: .res 1
+
+NMILoopPointer: .res 2
 
 controllers:            .res 4 ; buttons currently pressed
 controllers_pressed:    .res 4 ; buttons pressed this frame
-controllers_released:   .res 4 ; buttons pressed this frame
+controllers_released:   .res 4 ; buttons released this frame
 controllers_old:        .res 4 ; last frame's buttons
 
 BufferIndex:    .res 1  ; doubles as size; $FF = empty
@@ -35,15 +56,16 @@ Buffer_AddrLo:  .res 72
 Buffer_AddrHi:  .res 72
 Buffer_Data:     .res 72
 
+ButtonMask: .res 1
+
 .segment "OAM"
 SpriteZero: .res 4
 Sprites: .res (64*4)-4
 .segment "BSS"
 
-Controller1_Lookup: .res 16
-Controller2_Lookup: .res 16
-Controller3_Lookup: .res 16
-Controller4_Lookup: .res 16
+; PPU Address lookups for buttons
+;Controller_Lookup_Lo: .res 32
+;Controller_Lookup_Hi: .res 32
 
 .segment "VECTORS"
     .word NMI
@@ -84,52 +106,14 @@ NMI:
     lda #$02
     sta $4014
 
-    lda BufferIndex
-    bmi @emptyBuffer
-    tax
-    lda UnrolledLookup_lo, x
-    sta AddressPointer+0
-    lda UnrolledLookup_hi, x
-    sta AddressPointer+1
-    jmp (AddressPointer)
-
-;    ldy #48 ; max updates per frame
-;
-;@bufferLoop:
-;    lda Buffer_AddrHi, x
-;    sta $2006
-;    lda Buffer_AddrLo, x
-;    sta $2006
-;    lda Buffer_Data, x
-;    sta $2007
-;    dex
-;    bmi @buffDone
-;    dey
-;    bne @bufferLoop ; wait until the next frame to finish
-;
-;@buffWait:
-;    stx BufferIndex
-;    jmp @emptyBuffer
-;
-;@buffDone:
-;    lda #$FF
-;    sta BufferIndex
-;
-@emptyBuffer:
-
-    lda #0
-    sta $2005
-    sta $2005
-
-    lda #%1000_0000
-    sta $2000
-
-    pla
-    tay
-    pla
-    tax
-    pla
-    rti
+    ;lda BufferIndex
+    ;bmi @emptyBuffer
+    ;tax
+    ;lda UnrolledLookup_lo, x
+    ;sta AddressPointer+0
+    ;lda UnrolledLookup_hi, x
+    ;sta AddressPointer+1
+    jmp (NMILoopPointer)
 
 UnrolledLookup_hi:
     .repeat 72, i
@@ -145,13 +129,24 @@ UnrolledLoop:
     .repeat 72, i
     .ident( .sprintf("ul_%02d", (72-i-1))):
     ;.out .sprintf("ul_%02d", (72-i-1))
-    lda Buffer_AddrHi+(72-i-1)
-    sta $2006
-    lda Buffer_AddrLo+(72-i-1)
-    sta $2006
-    lda Buffer_Data+(72-i-1)
-    sta $2007
+    lda Buffer_AddrHi+(72-i-1)  ; 3
+    sta $2006                   ; 4
+    lda Buffer_AddrLo+(72-i-1)  ; 3
+    sta $2006                   ; 4
+    lda Buffer_Data+(72-i-1)    ; 3
+    sta $2007                   ; 4
+    ; 21 cycles
     .endrepeat
+
+NMI_Done:
+
+    lda #.lobyte(NMI_Done)
+    sta NMILoopPointer+0
+    lda #.hibyte(NMI_Done)
+    sta NMILoopPointer+1
+
+    lda #$FF
+    sta BufferIndex
 
     lda #0
     sta $2005
@@ -166,6 +161,27 @@ UnrolledLoop:
     tax
     pla
     rti
+
+PrepareNmiPointer:
+    lda BufferIndex
+    bmi @empty
+
+    tax
+    lda UnrolledLookup_lo, x
+    sta NMILoopPointer+0
+    lda UnrolledLookup_hi, x
+    sta NMILoopPointer+1
+    rts
+
+@empty:
+    lda #.lobyte(NMI_Done)
+    sta NMILoopPointer+0
+    lda #.hibyte(NMI_Done)
+    sta NMILoopPointer+1
+
+    lda #$FF
+    sta BufferIndex
+    rts
 
 ReadControllers:
     ; Freeze input
@@ -195,7 +211,7 @@ ReadControllers:
     and controllers_old, x
     sta controllers_released, x
 
-    inx
+    ldx #2
     ldy #8
     lda controllers, x
     sta controllers_old, x
@@ -216,7 +232,7 @@ ReadControllers:
     and controllers_old, x
     sta controllers_released, x
 
-    inx
+    ldx #1
     lda controllers, x
     sta controllers_old, x
     ldy #8
@@ -237,7 +253,7 @@ ReadControllers:
     and controllers_old, x
     sta controllers_released, x
 
-    inx
+    ldx #3
     lda controllers, x
     sta controllers_old, x
     ldy #8
@@ -266,6 +282,7 @@ ReadFeet:
     rts
 
 WaitForNMI:
+    jsr PrepareNmiPointer
 :   bit Sleeping
     bpl :-
     lda #0
@@ -573,29 +590,29 @@ DrawController:
     bne @loop
     rts
 
-LoadControllerLookup:
-    ; Start ppu addr in AddressPointer2
-    ; RAM table addr in AddressPointer
-    ldx #0
-    ldy #0
-    lda #8
-    sta TmpX
-@loop:
-    clc
-    lda ControllerButtonData, x
-    adc AddressPointer2+0
-    adc #$40
-    sta (AddressPointer), y
-    iny
-    lda AddressPointer2+1
-    adc #0
-    sta (AddressPointer), y
-    iny
-    inx
-
-    dec TmpX
-    bne @loop
-    rts
+;LoadControllerLookup:
+;    ; Start ppu addr in AddressPointer2
+;    ; RAM table addr in AddressPointer
+;    ldx #0
+;    ldy #0
+;    lda #8
+;    sta TmpX
+;@loop:
+;    clc
+;    lda ControllerButtonData, x ; load offset from anchor
+;    adc AddressPointer2+0 ; add PPU start
+;    adc #$40
+;    sta (AddressPointer), y ; store lo
+;    ;iny
+;    lda AddressPointer2+1
+;    adc #0
+;    sta (AddressPointer3), y ; store hi
+;    iny
+;    inx
+;
+;    dec TmpX
+;    bne @loop
+;    rts
 
 Init_Controllers:
 
@@ -651,11 +668,17 @@ Init_Controllers:
     tax
 
     ; Populate lookup table
-    lda ControllerLookupLookup+0, x
-    sta AddressPointer+0
-    lda ControllerLookupLookup+1, x
-    sta AddressPointer+1
-    jsr LoadControllerLookup
+    ;lda ControllerLookupLookupLo+0, x
+    ;sta AddressPointer+0
+    ;lda ControllerLookupLookupLo+1, x
+    ;sta AddressPointer+1
+
+    ;lda ControllerLookupLookupHi+0, x
+    ;sta AddressPointer3+0
+    ;lda ControllerLookupLookupHi+1, x
+    ;sta AddressPointer3+1
+
+    ;jsr LoadControllerLookup
 
     pla
     tax
@@ -668,6 +691,22 @@ Init_Controllers:
     cpx #7
     bcc @txtStart
 
+.if (DEBUG_CONTROLLER_LAYOUT = TRUE)
+    ; populate buttons for debugging
+    ldx #0
+    ldy #$A0 ; space on second table (grey square)
+:
+    lda Controller_Lookup_Hi, x
+    sta $2006
+    lda Controller_Lookup_Lo, x
+    sta $2006
+    sty $2007
+
+    inx
+    cpx #32
+    bne :-
+.endif
+
     jsr WaitForNMI
     lda #%0001_1110
     sta $2001
@@ -675,8 +714,65 @@ Init_Controllers:
 Frame_Controllers:
     jsr ReadControllers
 
+    ldx #0
+    jsr UpdateController
+
+    ldx #1
+    jsr UpdateController
+
+    ldx #2
+    jsr UpdateController
+
+    ldx #3
+    jsr UpdateController
+
     jsr WaitForNMI
     jmp Frame_Controllers
+
+; ControllerID in X
+UpdateController:
+    lda controllers, x
+    sta TmpY
+    lda #0
+    sta TmpX    ; loop counter
+    stx TmpZ    ; ControllerID
+
+@loop:
+    rol TmpY
+    bcc :+
+    ; pressed
+    lda #$80
+    jmp :++
+:   ; not pressed
+    lda #$00
+
+:   ldy TmpX ; button index
+    ora ControllerTileLookup, y
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda TmpZ
+    asl a
+    asl a
+    asl a
+    clc
+    adc TmpX
+    tay
+
+    lda Controller_Lookup_Lo, y
+    sta Buffer_AddrLo, x
+    lda Controller_Lookup_Hi, y
+    sta Buffer_AddrHi, x
+
+    inc TmpX
+    lda TmpX
+    cmp #8
+    bne @loop
+
+    rts
+
 
 Init_Keyboard:
     brk
@@ -715,30 +811,125 @@ Palettes:
     .byte $0F, $20, $10, $00
     .byte $0F, $20, $10, $00
 
-.enum ControllerData
-Btn_A
-Btn_B
-Btn_Select
-Btn_Start
-Btn_Up
-Btn_Down
-Btn_Left
-Btn_Right
-.endenum
+; Offsets from the top left of the controller.
+; Used to pre-compute PPU addresses
+;ControllerButtonData:
+;    .byte (1*32+8), (1*32+7), (1*32+4), (1*32+5)
+;    .byte (0*32+1), (2*32+1), (1*32+0), (1*32+2)
+;    ;.byte 18, 17, 14, 15, 1, 20, 10, 12
 
-ControllerButtonData:
-    .byte (1*32+8), (1*32+7), (1*32+4), (1*32+5)
-    .byte (0*32+1), (2*32+1), (1*32+0), (1*32+2)
-    ;.byte 18, 17, 14, 15, 1, 20, 10, 12
+ControllerTileLookup:
+    ;     A    B    S    S    U    D    L    R
+    .byte $1E, $1E, $1F, $1F, $10, $12, $13, $11
 
-ControllerLookupLookup:
-    .word Controller1_Lookup
-    .word Controller2_Lookup
-    .word Controller3_Lookup
-    .word Controller4_Lookup
+;ControllerLookupLookupLo:
+;    .word Controller_Lookup_Lo+0
+;    .word Controller_Lookup_Lo+8
+;    .word Controller_Lookup_Lo+16
+;    .word Controller_Lookup_Lo+24
+;
+;ControllerLookupLookupHi:
+;    .word Controller_Lookup_Hi+0
+;    .word Controller_Lookup_Hi+8
+;    .word Controller_Lookup_Hi+16
+;    .word Controller_Lookup_Hi+24
+
+; LabelAddrs + $40
+Ctrl1_Addr = $20C4
+Ctrl2_Addr = $20D3
+Ctrl3_Addr = $2244
+Ctrl4_Addr = $2253
+
+; PPU Address lookup tables for controller buttons
+Controller_Lookup_Lo:
+    ; Controller 1
+    .byte .lobyte(Ctrl1_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl1_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl1_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl1_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl1_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl1_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl1_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl1_Addr + (1*32+2))  ; Right
+
+    ; Controller 2
+    .byte .lobyte(Ctrl2_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl2_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl2_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl2_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl2_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl2_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl2_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl2_Addr + (1*32+2))  ; Right
+
+    ; Controller 3
+    .byte .lobyte(Ctrl3_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl3_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl3_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl3_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl3_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl3_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl3_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl3_Addr + (1*32+2))  ; Right
+
+    ; Controller 4
+    .byte .lobyte(Ctrl4_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl4_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl4_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl4_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl4_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl4_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl4_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl4_Addr + (1*32+2))  ; Right
+
+Controller_Lookup_Hi:
+    ; Controller 1
+    .byte .hibyte(Ctrl1_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl1_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl1_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl1_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl1_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl1_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl1_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl1_Addr + (1*32+2))  ; Right
+
+    ; Controller 2
+    .byte .hibyte(Ctrl2_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl2_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl2_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl2_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl2_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl2_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl2_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl2_Addr + (1*32+2))  ; Right
+
+    ; Controller 3
+    .byte .hibyte(Ctrl3_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl3_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl3_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl3_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl3_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl3_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl3_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl3_Addr + (1*32+2))  ; Right
+
+    ; Controller 4
+    .byte .hibyte(Ctrl4_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl4_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl4_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl4_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl4_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl4_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl4_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl4_Addr + (1*32+2))  ; Right
 
 ControllerTiles:
     .include "controller.i"
 
 KeyboardTiles:
     .include "keyboard.i"
+
+Mult8:
+    .repeat 4, i
+    .byte (8 * i)
+    .endrepeat
