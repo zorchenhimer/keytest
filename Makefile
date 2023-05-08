@@ -9,7 +9,9 @@ LDFLAGS = -C $(NESCFG) --dbgfile bin/$(NAME).dbg -m bin/$(NAME).map
 
 SOURCES = main.asm \
 		  controller.i \
-		  keyboard.i
+		  keyboard.i \
+		  family-trainer-a.i \
+		  family-trainer-b.i
 CHR = font.chr
 
 default: env bin/$(NAME).nes
@@ -40,6 +42,12 @@ controller.i: images/controller.tmx $(SCRCONV)
 
 keyboard.i: images/keyboard.tmx $(SCRCONV)
 	go run convert-screen.go $< $@ --layer main --fill 32
+
+family-trainer-a.i: images/family-trainer-split.tmx $(SCRCONV)
+	go run convert-screen.go $< $@ --layer SideA --fill 32
+
+family-trainer-b.i: images/family-trainer-split.tmx $(SCRCONV)
+	go run convert-screen.go $< $@ --layer SideB --fill 32
 
 $(CHRUTIL):
 	$(MAKE) -C go-nes/ bin/chrutil$(EXT)

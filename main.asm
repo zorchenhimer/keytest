@@ -12,10 +12,14 @@ nes2end
 .feature underline_in_numbers
 .feature addrsize
 
-TRUE = 1
+TRUE  = 1
 FALSE = 0
 
 DEBUG_CONTROLLER_LAYOUT = FALSE
+DEBUG_FEET_LAYOUT       = FALSE
+
+FEET_PPU_ADDR_A = $20C6
+FEET_PPU_ADDR_B = $20D3
 
 .enum ControllerData
 Btn_A
@@ -28,6 +32,19 @@ Btn_Left
 Btn_Right
 .endenum
 
+BUTTON_A        = 1 << 7
+BUTTON_B        = 1 << 6
+BUTTON_SELECT   = 1 << 5
+BUTTON_START    = 1 << 4
+BUTTON_UP       = 1 << 3
+BUTTON_DOWN     = 1 << 2
+BUTTON_LEFT     = 1 << 1
+BUTTON_RIGHT    = 1 << 0
+
+FEET_COL0 = %0001_0000
+FEET_COL1 = %0000_1000
+FEET_COL2 = %0000_0100
+FEET_COL3 = %0000_0010
 
 .segment "ZEROPAGE"
 Sleeping: .res 1
@@ -46,11 +63,6 @@ MenuSelection: .res 1
 
 NMILoopPointer: .res 2
 
-controllers:            .res 4 ; buttons currently pressed
-controllers_pressed:    .res 4 ; buttons pressed this frame
-controllers_released:   .res 4 ; buttons released this frame
-controllers_old:        .res 4 ; last frame's buttons
-
 BufferIndex:    .res 1  ; doubles as size; $FF = empty
 Buffer_AddrLo:  .res 72
 Buffer_AddrHi:  .res 72
@@ -63,9 +75,12 @@ SpriteZero: .res 4
 Sprites: .res (64*4)-4
 .segment "BSS"
 
-; PPU Address lookups for buttons
-;Controller_Lookup_Lo: .res 32
-;Controller_Lookup_Hi: .res 32
+controllers:            .res 4 ; buttons currently pressed
+controllers_pressed:    .res 4 ; buttons pressed this frame
+controllers_released:   .res 4 ; buttons released this frame
+controllers_old:        .res 4 ; last frame's buttons
+
+FeetInput: .res 2
 
 .segment "VECTORS"
     .word NMI
@@ -76,15 +91,6 @@ Sprites: .res (64*4)-4
     .incbin "font.chr"
 
 .segment "CHR1"
-
-BUTTON_A        = 1 << 7
-BUTTON_B        = 1 << 6
-BUTTON_SELECT   = 1 << 5
-BUTTON_START    = 1 << 4
-BUTTON_UP       = 1 << 3
-BUTTON_DOWN     = 1 << 2
-BUTTON_LEFT     = 1 << 1
-BUTTON_RIGHT    = 1 << 0
 
 .segment "PAGE0"
 
@@ -515,6 +521,10 @@ Frame_Menu:
     and controllers_pressed
     beq :+
     jsr WaitForNMI
+
+    lda #$20
+    sta SpriteZero+1
+
     lda MenuSelection
     asl a
     tax
@@ -590,32 +600,7 @@ DrawController:
     bne @loop
     rts
 
-;LoadControllerLookup:
-;    ; Start ppu addr in AddressPointer2
-;    ; RAM table addr in AddressPointer
-;    ldx #0
-;    ldy #0
-;    lda #8
-;    sta TmpX
-;@loop:
-;    clc
-;    lda ControllerButtonData, x ; load offset from anchor
-;    adc AddressPointer2+0 ; add PPU start
-;    adc #$40
-;    sta (AddressPointer), y ; store lo
-;    ;iny
-;    lda AddressPointer2+1
-;    adc #0
-;    sta (AddressPointer3), y ; store hi
-;    iny
-;    inx
-;
-;    dec TmpX
-;    bne @loop
-;    rts
-
 Init_Controllers:
-
     lda #%1000_0000
     sta $2000
 
@@ -623,9 +608,6 @@ Init_Controllers:
     sta $2001
 
     jsr ClearScreen
-
-    lda #0
-    sta SpriteZero+1
 
     ldx #0
     ldy #0
@@ -696,9 +678,9 @@ Init_Controllers:
     ldx #0
     ldy #$A0 ; space on second table (grey square)
 :
-    lda Controller_Lookup_Hi, x
+    lda ControllerLookupHi, x
     sta $2006
-    lda Controller_Lookup_Lo, x
+    lda ControllerLookupLo, x
     sta $2006
     sty $2007
 
@@ -761,9 +743,9 @@ UpdateController:
     adc TmpX
     tay
 
-    lda Controller_Lookup_Lo, y
+    lda ControllerLookupLo, y
     sta Buffer_AddrLo, x
-    lda Controller_Lookup_Hi, y
+    lda ControllerLookupHi, y
     sta Buffer_AddrHi, x
 
     inc TmpX
@@ -778,9 +760,300 @@ Init_Keyboard:
     brk
     jmp Init_Keyboard
 
+; PPU Address in AddressPointer
+; Tile layout label in AddressPointer2
+DrawFeetController:
+    lda AddressPointer+1
+    sta $2006
+    lda AddressPointer+0
+    sta $2006
+
+    ldy #2
+    lda (AddressPointer2), y
+    tax
+
+    ; height
+    ldy #3
+    lda (AddressPointer2), y
+    sta TmpX
+
+    ; byte offset
+    ldy #4
+@loop:
+    lda (AddressPointer2), y
+    sta $2007
+    iny
+
+    dex
+    bne @loop
+
+    clc
+    lda AddressPointer+0
+    adc #$20
+    sta AddressPointer+0
+    tax
+    lda AddressPointer+1
+    adc #0
+    sta AddressPointer+1
+    sta $2006
+    stx $2006
+
+    sty TmpY
+    ldy #2
+    lda (AddressPointer2), y
+    tax
+    ldy TmpY
+
+    dec TmpX
+    lda TmpX
+    bne @loop
+    rts
+
 Init_Feet:
-    brk
-    jmp Init_Feet
+    lda #%1000_0000
+    sta $2000
+
+    lda #0
+    sta $2001
+
+    jsr ClearScreen
+
+    ; Draw the controler on screen
+    lda #.hibyte(FEET_PPU_ADDR_A)
+    sta AddressPointer+1
+    lda #.lobyte(FEET_PPU_ADDR_A)
+    sta AddressPointer+0
+
+
+    lda #.lobyte(FamilyTrainerTiles_SideA)
+    sta AddressPointer2+0
+    lda #.hibyte(FamilyTrainerTiles_SideA)
+    sta AddressPointer2+1
+
+    jsr DrawFeetController
+
+    lda #.hibyte(FEET_PPU_ADDR_B)
+    sta AddressPointer+1
+    lda #.lobyte(FEET_PPU_ADDR_B)
+    sta AddressPointer+0
+
+    lda #.lobyte(FamilyTrainerTiles_SideB)
+    sta AddressPointer2+0
+    lda #.hibyte(FamilyTrainerTiles_SideB)
+    sta AddressPointer2+1
+
+    jsr DrawFeetController
+
+.if (DEBUG_FEET_LAYOUT = TRUE)
+    ldx #0
+    ldy #$A0
+:
+    lda FeetLookupAHi, x
+    sta $2006
+    lda FeetLookupALo, x
+    sta $2006
+    sty $2007
+
+    inx
+    cpx #12
+    bne :-
+
+    ldx #0
+:
+    lda FeetLookupBHi, x
+    sta $2006
+    lda FeetLookupBLo, x
+    sta $2006
+    sty $2007
+
+    inx
+    cpx #12
+    bne :-
+.endif
+
+    jsr WaitForNMI
+    lda #%0001_1110
+    sta $2001
+
+Frame_Feet:
+    jsr ReadFamilyTrainer
+
+    ldy #0
+    ;sta TmpX
+@loop:
+    rol FeetInput+1
+    rol FeetInput+0
+    bcc :+
+    ; pressed
+    lda #$80
+    jmp :++
+:   ; not pressed
+    lda #$00
+:
+    ;ldy TmpX
+    ora FeetTileLookupB, y
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda FeetLookupBLo, y
+    sta Buffer_AddrLo, x
+    lda FeetLookupBHi, y
+    sta Buffer_AddrHi, x
+
+    iny
+    ;lda TmpX
+    cpy #12
+    bne @loop
+
+    jsr WaitForNMI
+    jmp Frame_Feet
+
+ReadFamilyTrainer:
+    lda #0
+    sta FeetInput+0
+    sta FeetInput+1
+
+    ; Read top row first
+    lda #%0000_0011
+    sta $4016
+    jsr FamilyTrainerWait
+
+    lda $4017
+    sta TmpX
+    and #FEET_COL0
+    bne :+
+    ; pressed
+    lda #%1000_0000
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL1
+    bne :+
+    ; pressed
+    lda #%0100_0000
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL2
+    bne :+
+    ; pressed
+    lda #%0010_0000
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL3
+    bne :+
+    ; pressed
+    lda #%0001_0000
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    ; Read middle row next
+    lda #%0000_0101
+    sta $4016
+    jsr FamilyTrainerWait
+
+    lda $4017
+    sta TmpX
+    and #FEET_COL0
+    bne :+
+    ; pressed
+    lda #%0000_1000
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL1
+    bne :+
+    ; pressed
+    lda #%0000_0100
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL2
+    bne :+
+    ; pressed
+    lda #%0000_0010
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    lda TmpX
+    and #FEET_COL3
+    bne :+
+    ; pressed
+    lda #%0000_0001
+    ora FeetInput+0
+    sta FeetInput+0
+:
+
+    ; Read bottom row last
+    lda #%0000_0110
+    sta $4016
+    jsr FamilyTrainerWait
+
+    lda $4017
+    sta TmpX
+    and #FEET_COL0
+    bne :+
+    ; pressed
+    lda #%1000_0000
+    ora FeetInput+1
+    sta FeetInput+1
+:
+
+    lda TmpX
+    and #FEET_COL1
+    bne :+
+    ; pressed
+    lda #%0100_0000
+    ora FeetInput+1
+    sta FeetInput+1
+:
+
+    lda TmpX
+    and #FEET_COL2
+    bne :+
+    ; pressed
+    lda #%0010_0000
+    ora FeetInput+1
+    sta FeetInput+1
+:
+
+    lda TmpX
+    and #FEET_COL3
+    bne :+
+    ; pressed
+    lda #%0001_0000
+    ora FeetInput+1
+    sta FeetInput+1
+:
+    rts
+
+; TODO: Figure out the lower limit for waiting.
+FamilyTrainerWait:
+    ldy #128
+    ldx #0
+:
+    inc $8000, x
+    inc $8000, x
+    dey
+    cpy #0
+    bne :-
+
+    rts
 
 MenuItems:
     .asciiz "Controllers"
@@ -800,39 +1073,20 @@ MenuDestinations:
 
 Palettes:
     ; BG
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
 
     ; Sprite
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
-    .byte $0F, $20, $10, $00
-
-; Offsets from the top left of the controller.
-; Used to pre-compute PPU addresses
-;ControllerButtonData:
-;    .byte (1*32+8), (1*32+7), (1*32+4), (1*32+5)
-;    .byte (0*32+1), (2*32+1), (1*32+0), (1*32+2)
-;    ;.byte 18, 17, 14, 15, 1, 20, 10, 12
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $2A, $00
 
 ControllerTileLookup:
     ;     A    B    S    S    U    D    L    R
     .byte $1E, $1E, $1F, $1F, $10, $12, $13, $11
-
-;ControllerLookupLookupLo:
-;    .word Controller_Lookup_Lo+0
-;    .word Controller_Lookup_Lo+8
-;    .word Controller_Lookup_Lo+16
-;    .word Controller_Lookup_Lo+24
-;
-;ControllerLookupLookupHi:
-;    .word Controller_Lookup_Hi+0
-;    .word Controller_Lookup_Hi+8
-;    .word Controller_Lookup_Hi+16
-;    .word Controller_Lookup_Hi+24
 
 ; LabelAddrs + $40
 Ctrl1_Addr = $20C4
@@ -841,7 +1095,7 @@ Ctrl3_Addr = $2244
 Ctrl4_Addr = $2253
 
 ; PPU Address lookup tables for controller buttons
-Controller_Lookup_Lo:
+ControllerLookupLo:
     ; Controller 1
     .byte .lobyte(Ctrl1_Addr + (1*32+8))  ; A
     .byte .lobyte(Ctrl1_Addr + (1*32+7))  ; B
@@ -882,7 +1136,7 @@ Controller_Lookup_Lo:
     .byte .lobyte(Ctrl4_Addr + (1*32+0))  ; Left
     .byte .lobyte(Ctrl4_Addr + (1*32+2))  ; Right
 
-Controller_Lookup_Hi:
+ControllerLookupHi:
     ; Controller 1
     .byte .hibyte(Ctrl1_Addr + (1*32+8))  ; A
     .byte .hibyte(Ctrl1_Addr + (1*32+7))  ; B
@@ -929,7 +1183,81 @@ ControllerTiles:
 KeyboardTiles:
     .include "keyboard.i"
 
-Mult8:
-    .repeat 4, i
-    .byte (8 * i)
-    .endrepeat
+FeetTileLookupA:
+    .byte $20, $00, $00, $20
+    .byte $00, $00, $00, $00
+    .byte $20, $00, $00, $20
+
+FeetTileLookupB:
+    .byte $31, $32, $33, $34
+    .byte $35, $36, $37, $38
+    .byte $39, $0D, $0E, $0F
+
+FeetLookupALo:
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+6))
+
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+6))
+
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+6))
+
+FeetLookupAHi:
+    .byte .hibyte(FEET_PPU_ADDR_A + (2*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_A + (2*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_A + (2*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_A + (2*32+6))
+
+    .byte .hibyte(FEET_PPU_ADDR_A + (4*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_A + (4*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_A + (4*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_A + (4*32+6))
+
+    .byte .hibyte(FEET_PPU_ADDR_A + (6*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_A + (6*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_A + (6*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_A + (6*32+6))
+
+FeetLookupBLo:
+    .byte .lobyte(FEET_PPU_ADDR_B + (2*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_B + (2*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_B + (2*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_B + (2*32+6))
+
+    .byte .lobyte(FEET_PPU_ADDR_B + (4*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_B + (4*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_B + (4*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_B + (4*32+6))
+
+    .byte .lobyte(FEET_PPU_ADDR_B + (6*32+0))
+    .byte .lobyte(FEET_PPU_ADDR_B + (6*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_B + (6*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_B + (6*32+6))
+
+FeetLookupBHi:
+    .byte .hibyte(FEET_PPU_ADDR_B + (2*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_B + (2*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_B + (2*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_B + (2*32+6))
+
+    .byte .hibyte(FEET_PPU_ADDR_B + (4*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_B + (4*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_B + (4*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_B + (4*32+6))
+
+    .byte .hibyte(FEET_PPU_ADDR_B + (6*32+0))
+    .byte .hibyte(FEET_PPU_ADDR_B + (6*32+2))
+    .byte .hibyte(FEET_PPU_ADDR_B + (6*32+4))
+    .byte .hibyte(FEET_PPU_ADDR_B + (6*32+6))
+
+FamilyTrainerTiles_SideA:
+    .include "family-trainer-a.i"
+FamilyTrainerTiles_SideB:
+    .include "family-trainer-b.i"
