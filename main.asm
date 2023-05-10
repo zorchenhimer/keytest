@@ -70,6 +70,10 @@ Buffer_Data:     .res 72
 
 ButtonMask: .res 1
 
+; Loop count value for the FamilyTrainerWait
+; routine
+FTWaitVal: .res 1
+
 .segment "OAM"
 SpriteZero: .res 4
 Sprites: .res (64*4)-4
@@ -871,6 +875,11 @@ Init_Feet:
     bne :-
 .endif
 
+    ; In my testing, 39 loops seemed sufficient
+    ; (~758 cycles).  Round up for good measure.
+    lda #40
+    sta FTWaitVal
+
     jsr WaitForNMI
     lda #%0001_1110
     sta $2001
@@ -907,8 +916,72 @@ Frame_Feet:
     cpy #12
     bne @loop
 
+    ; Allow variable delay between the write to
+    ; $4016 and the read from $4017.  Left/B
+    ; lowers value, Right/A raises value.  Value
+    ; is loop itterations, not cycles.  There are
+    ; 19 cycles per loop, plus a bunch for
+    ; before/after.
+    jsr ReadControllers
+    lda #BUTTON_A
+    and controllers_pressed
+    beq :+
+    inc FTWaitVal
+:
+
+    lda #BUTTON_LEFT
+    and controllers_pressed
+    beq :+
+    dec FTWaitVal
+:
+
+    lda #BUTTON_RIGHT
+    and controllers_pressed
+    beq :+
+    inc FTWaitVal
+:
+
+    lda #BUTTON_B
+    and controllers_pressed
+    beq :+
+    dec FTWaitVal
+:
+
+    lda FTWaitVal
+    and #$0F
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    ldy #$20
+    sty Buffer_AddrHi, x
+
+    lda #$70
+    sta Buffer_AddrLo, x
+
+    lda FTWaitVal
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+    sty Buffer_AddrHi, x
+    lda #$6F
+    sta Buffer_AddrLo, x
+
     jsr WaitForNMI
     jmp Frame_Feet
+
+HexAscii:
+    .byte "0123456789ABCDEF"
 
 ReadFamilyTrainer:
     lda #0
@@ -1042,18 +1115,29 @@ ReadFamilyTrainer:
 :
     rts
 
-; TODO: Figure out the lower limit for waiting.
 FamilyTrainerWait:
-    ldy #128
-    ldx #0
+    ; FTWaitVal value of $27 seems to be the
+    ; lowest reliable
+    ldy FTWaitVal   ; 3
+    ldx #0          ; 2
 :
-    inc $8000, x
-    inc $8000, x
-    dey
-    cpy #0
-    bne :-
+    inc $8000, x    ; 7
+    inc $8000, x    ; 7
+    dey             ; 2
+    bne :-          ; 3 each loop; 2 on last
+                    ; (doesn't currently cross a page)
 
-    rts
+; 39 loops
+; 19 cycles per loop
+
+; 741 cycles in loop (740?)
+
+; 11 cycles outside
+; 6  cycles for jsr
+
+; ~758 cycles between reads
+
+    rts ; 6
 
 MenuItems:
     .asciiz "Controllers"
