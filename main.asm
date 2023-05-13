@@ -193,6 +193,10 @@ PrepareNmiPointer:
     sta BufferIndex
     rts
 
+; Famicom expansion port controllers
+ReadControllersExpansion:
+    rts
+
 ReadControllers:
     ; Freeze input
     lda #1
@@ -211,16 +215,6 @@ ReadControllers:
     dey
     bne @player1
 
-    lda controllers, x
-    eor controllers_old, x
-    and controllers, x
-    sta controllers_pressed, x
-
-    lda controllers, x
-    eor controllers_old, x
-    and controllers_old, x
-    sta controllers_released, x
-
     ldx #2
     ldy #8
     lda controllers, x
@@ -231,16 +225,6 @@ ReadControllers:
     rol controllers, x ; Bit0 <- Carry
     dey
     bne @player3
-
-    lda controllers, x
-    eor controllers_old, x
-    and controllers, x
-    sta controllers_pressed, x
-
-    lda controllers, x
-    eor controllers_old, x
-    and controllers_old, x
-    sta controllers_released, x
 
     ldx #1
     lda controllers, x
@@ -253,16 +237,6 @@ ReadControllers:
     dey
     bne @player2
 
-    lda controllers, x
-    eor controllers_old, x
-    and controllers, x
-    sta controllers_pressed, x
-
-    lda controllers, x
-    eor controllers_old, x
-    and controllers_old, x
-    sta controllers_released, x
-
     ldx #3
     lda controllers, x
     sta controllers_old, x
@@ -274,7 +248,23 @@ ReadControllers:
     dey
     bne @player4
 
+    ; If a controller has all buttons pressed, it
+    ; doesn't exist.  This will happen if the
+    ; four score isn't plugged in.
+    ldx #0
+@pressedLoop:
     lda controllers, x
+    eor #$FF
+    bne :+
+    ; no controller here
+    lda #0
+    sta controllers, x
+    sta controllers_old, x
+    sta controllers_pressed, x
+    sta controllers_released, x
+    jmp :++
+
+:   lda controllers, x
     eor controllers_old, x
     and controllers, x
     sta controllers_pressed, x
@@ -283,6 +273,11 @@ ReadControllers:
     eor controllers_old, x
     and controllers_old, x
     sta controllers_released, x
+:
+    inx
+    cpx #4
+    bne @pressedLoop
+
     rts
 
 ReadKeyboard:
@@ -551,39 +546,28 @@ Frame_Menu:
     jsr WaitForNMI
     jmp Frame_Menu
 
-ControllerLabels:
-    .asciiz "Player 1"
-    .asciiz "Player 2"
-    .asciiz "Player 3"
-    .asciiz "Player 4"
-
-ControllerLabelAddrs:
-    .word $2084
-    .word $2093
-    .word $2204
-    .word $2213
-
-DrawController:
+DrawTiledRegion:
     ; Start address in AddressPointer
+    ; Data address in AddressPointer2
     lda AddressPointer+1
     sta $2006
     lda AddressPointer+0
     sta $2006
 
-    ldx #2
-    lda ControllerTiles, x
-    tay ; width
-    sta TmpX
-    inx
-    lda ControllerTiles, x
-    sta TmpY ; height
-    inx
+    ldy #2
+    lda (AddressPointer2), y
+    tax
+    sta TmpX    ; width
+    iny
+    lda (AddressPointer2), y
+    sta TmpY    ; height
+    iny
 
 @loop:
-    lda ControllerTiles, x
+    lda (AddressPointer2), y
     sta $2007
-    inx
-    dey
+    iny
+    dex
     bne @loop
 
     ; next row
@@ -598,8 +582,7 @@ DrawController:
     lda AddressPointer+0
     sta $2006
 
-    lda TmpX
-    tay
+    ldx TmpX
     dec TmpY
     bne @loop
     rts
@@ -613,16 +596,19 @@ Init_Controllers:
 
     jsr ClearScreen
 
+    lda #.lobyte(ControllerTiles)
+    sta AddressPointer2+0
+    lda #.hibyte(ControllerTiles)
+    sta AddressPointer2+1
+
     ldx #0
     ldy #0
 @txtStart:
     lda ControllerLabelAddrs+1, x
     sta AddressPointer+1
-    sta AddressPointer2+1
     sta $2006
     lda ControllerLabelAddrs+0, x
     sta AddressPointer+0
-    sta AddressPointer2+0
     sta $2006
 
 @txtLoop:
@@ -638,6 +624,8 @@ Init_Controllers:
     pha
     txa
     pha
+    tya
+    pha
 
     ; draw controller
     clc
@@ -647,24 +635,13 @@ Init_Controllers:
     lda AddressPointer+1
     adc #0
     sta AddressPointer+1
-    jsr DrawController
+    jsr DrawTiledRegion
 
+    pla
+    tay
     pla
     pha
     tax
-
-    ; Populate lookup table
-    ;lda ControllerLookupLookupLo+0, x
-    ;sta AddressPointer+0
-    ;lda ControllerLookupLookupLo+1, x
-    ;sta AddressPointer+1
-
-    ;lda ControllerLookupLookupHi+0, x
-    ;sta AddressPointer3+0
-    ;lda ControllerLookupLookupHi+1, x
-    ;sta AddressPointer3+1
-
-    ;jsr LoadControllerLookup
 
     pla
     tax
@@ -719,6 +696,7 @@ Frame_Controllers:
 UpdateController:
     lda controllers, x
     sta TmpY
+
     lda #0
     sta TmpX    ; loop counter
     stx TmpZ    ; ControllerID
@@ -761,8 +739,33 @@ UpdateController:
 
 
 Init_Keyboard:
-    brk
-    jmp Init_Keyboard
+    lda #%1000_0000
+    sta $2000
+
+    lda #0
+    sta $2001
+
+    jsr ClearScreen
+
+    lda #.lobyte(KeyboardTiles)
+    sta AddressPointer2+0
+    lda #.hibyte(KeyboardTiles)
+    sta AddressPointer2+1
+
+    lda ControllerLabelAddrs+1, x
+    sta AddressPointer+1
+    lda ControllerLabelAddrs+0, x
+    sta AddressPointer+0
+    jsr DrawTiledRegion
+
+    jsr WaitForNMI
+    lda #%0001_1110
+    sta $2001
+
+Frame_Keyboard:
+
+    jsr WaitForNMI
+    jmp Frame_Keyboard
 
 ; PPU Address in AddressPointer
 ; Tile layout label in AddressPointer2
@@ -909,6 +912,23 @@ Frame_Feet:
     lda FeetLookupBLo, y
     sta Buffer_AddrLo, x
     lda FeetLookupBHi, y
+    sta Buffer_AddrHi, x
+
+    bcc :+
+    lda #$80
+    jmp :++
+:
+    lda #$00
+:
+    ora FeetTileLookupA, y
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda FeetLookupALo, y
+    sta Buffer_AddrLo, x
+    lda FeetLookupAHi, y
     sta Buffer_AddrHi, x
 
     iny
@@ -1172,11 +1192,27 @@ ControllerTileLookup:
     ;     A    B    S    S    U    D    L    R
     .byte $1E, $1E, $1F, $1F, $10, $12, $13, $11
 
-; LabelAddrs + $40
-Ctrl1_Addr = $20C4
-Ctrl2_Addr = $20D3
-Ctrl3_Addr = $2244
-Ctrl4_Addr = $2253
+ControllerLabels:
+    .asciiz "Player 1"
+    .asciiz "Player 2"
+    .asciiz "Player 3"
+    .asciiz "Player 4"
+
+Ctrl1_LabelAddr = $2084
+Ctrl2_LabelAddr = $2093
+Ctrl3_LabelAddr = $2184
+Ctrl4_LabelAddr = $2193
+
+ControllerLabelAddrs:
+    .word Ctrl1_LabelAddr
+    .word Ctrl2_LabelAddr
+    .word Ctrl3_LabelAddr
+    .word Ctrl4_LabelAddr
+
+Ctrl1_Addr = Ctrl1_LabelAddr + $40
+Ctrl2_Addr = Ctrl2_LabelAddr + $40
+Ctrl3_Addr = Ctrl3_LabelAddr + $40
+Ctrl4_Addr = Ctrl4_LabelAddr + $40
 
 ; PPU Address lookup tables for controller buttons
 ControllerLookupLo:
@@ -1278,20 +1314,20 @@ FeetTileLookupB:
     .byte $39, $0D, $0E, $0F
 
 FeetLookupALo:
-    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+0))
-    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+2))
-    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+4))
     .byte .lobyte(FEET_PPU_ADDR_A + (2*32+6))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (2*32+0))
 
-    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+0))
-    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+2))
-    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+4))
     .byte .lobyte(FEET_PPU_ADDR_A + (4*32+6))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (4*32+0))
 
-    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+0))
-    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+2))
-    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+4))
     .byte .lobyte(FEET_PPU_ADDR_A + (6*32+6))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+4))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+2))
+    .byte .lobyte(FEET_PPU_ADDR_A + (6*32+0))
 
 FeetLookupAHi:
     .byte .hibyte(FEET_PPU_ADDR_A + (2*32+0))
