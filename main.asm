@@ -173,14 +173,14 @@ SpriteZero: .res 4
 Sprites: .res (64*4)-4
 .segment "BSS"
 
-controllers:            .res 4 ; buttons currently pressed
-controllers_pressed:    .res 4 ; buttons pressed this frame
-controllers_released:   .res 4 ; buttons released this frame
-controllers_old:        .res 4 ; last frame's buttons
+controllers:            .res 6 ; buttons currently pressed
+controllers_pressed:    .res 6 ; buttons pressed this frame
+controllers_released:   .res 6 ; buttons released this frame
+controllers_old:        .res 6 ; last frame's buttons
 
 FeetInput: .res 2
-
 KeyboardStatus: .res 72
+Trackball: .res 3
 
 NMI_Ram: .res 917
 
@@ -307,20 +307,27 @@ ReadControllers:
     sta $4016
 
     ldx #0
-    ldy #8
+@oldloop:
     lda controllers, x
     sta controllers_old, x
+    inx
+    cpx #6 ; FIXME: make this value a constant
+    bne @oldloop
+
+    ldx #0
+    ldy #8
 @player1:
     lda $4016
     lsr A              ; Bit0 -> Carry
     rol controllers, x ; Bit0 <- Carry
+    ; famicom expanion controller
+    lsr A
+    rol controllers+4, x
     dey
     bne @player1
 
     ldx #2
     ldy #8
-    lda controllers, x
-    sta controllers_old, x
 @player3:
     lda $4016
     lsr A              ; Bit0 -> Carry
@@ -329,19 +336,18 @@ ReadControllers:
     bne @player3
 
     ldx #1
-    lda controllers, x
-    sta controllers_old, x
     ldy #8
 @player2:
     lda $4017
     lsr A              ; Bit0 -> Carry
     rol controllers, x ; Bit0 <- Carry
+    ; famicom expanion controller
+    lsr A
+    rol controllers+4, x
     dey
     bne @player2
 
     ldx #3
-    lda controllers, x
-    sta controllers_old, x
     ldy #8
 @player4:
     lda $4017
@@ -377,7 +383,7 @@ ReadControllers:
     sta controllers_released, x
 :
     inx
-    cpx #4
+    cpx #6
     bne @pressedLoop
 
     rts
@@ -403,7 +409,7 @@ DrawMenu:
     sta $2006
     sta TmpX
 
-    ldy #3
+    ldy #MenuItemCount
     ldx #0
 @loop:
     lda MenuItems, x
@@ -595,28 +601,39 @@ RESET:
 Frame_Menu:
     jsr ReadControllers
 
+    ldx #0
+    stx TmpX
+@loop:
+    lda controllers_pressed, x
+    ora TmpX
+    sta TmpX
+    inx
+    cpx #6
+    bne @loop
+
+
     lda #BUTTON_DOWN
-    and controllers_pressed
+    and TmpX
     beq :+
     inc MenuSelection
     lda MenuSelection
-    cmp #3
+    cmp #MenuItemCount
     bcc :+
     lda #0  ; handle overflow
     sta MenuSelection
 :
     lda #BUTTON_UP
-    and controllers_pressed
+    and TmpX
     beq :+
     dec MenuSelection
     lda MenuSelection
     bpl :+
-    lda #2
+    lda #MenuItemCount-1
     sta MenuSelection
 :
 
     lda #BUTTON_A
-    and controllers_pressed
+    and TmpX
     beq :+
     jsr WaitForNMI
 
@@ -1406,21 +1423,239 @@ FamilyTrainerWait:
 
     rts ; 6
 
+Init_Trackball:
+    lda #%1000_0000
+    sta $2000
+
+    lda #0
+    sta $2001
+
+    jsr ClearScreen
+
+    ;; setup stuff
+    lda #$84
+    clc
+    adc #$40
+    sta AddressPointer+0
+    lda #$20
+    adc #0
+    sta AddressPointer+1
+
+    lda #.lobyte(ControllerTiles)
+    sta AddressPointer2+0
+    lda #.hibyte(ControllerTiles)
+    sta AddressPointer2+1
+    jsr DrawTiledRegion
+
+    lda #$00
+    sta SpriteZero+1
+    sta SpriteZero+2
+    lda #120
+    sta SpriteZero+3
+    lda #96
+    sta SpriteZero+0
+
+    jsr WaitForNMI
+    lda #%0001_1110
+    sta $2001
+
+Frame_Trackball:
+    jsr ReadTrackball
+
+    lda #0
+    sta TmpX
+@loop:
+    rol controllers+0
+    bcc :+
+    lda #$80
+    jmp :++
+:   lda #$00
+
+:   ldy TmpX
+    ora ControllerTileLookup, y
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda ControllerLookupLo, y
+    sta Buffer_AddrLo, x
+    lda ControllerLookupHi, y
+    sta Buffer_AddrHi, x
+
+    inc TmpX
+    lda TmpX
+    cmp #8
+    bne @loop
+
+    lda controllers+1
+    and #$0F
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda #$87
+    sta Buffer_AddrLo, x
+    lda #$20
+    sta Buffer_AddrHi, x
+
+    lda controllers+1
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda #$88
+    sta Buffer_AddrLo, x
+    lda #$20
+    sta Buffer_AddrHi, x
+
+    lda controllers+2
+    and #$0F
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda #$89
+    sta Buffer_AddrLo, x
+    lda #$20
+    sta Buffer_AddrHi, x
+
+    lda controllers+2
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda HexAscii, x
+
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda #$8A
+    sta Buffer_AddrLo, x
+    lda #$20
+    sta Buffer_AddrHi, x
+
+    ; Trackball Sprite
+    ; Axis 2
+    ; FIXME: horizontal is backwards
+    lda controllers+1
+    and #$08
+    beq :+
+    clc
+    lda controllers+1
+    and #$07
+    ora #$F8
+    adc SpriteZero+0
+    sta SpriteZero+0
+    jmp :++
+:
+    clc
+    lda controllers+1
+    and #$07
+    adc SpriteZero+0
+    sta SpriteZero+0
+:
+
+    ; Axis 1
+    lda controllers+1
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta TmpX
+    and #$08
+    beq :+
+    clc
+    lda TmpX
+    and #$07
+    ora #$F8
+    adc SpriteZero+3
+    sta SpriteZero+3
+    jmp :++
+:
+    clc
+    lda TmpX
+    and #$07
+    adc SpriteZero+3
+    sta SpriteZero+3
+:
+
+    jsr WaitForNMI
+    jmp Frame_Trackball
+
+ReadTrackball:
+    lda #1
+    sta $4016
+    lda #0
+    sta $4016
+
+    ldy #8
+:
+    lda $4016
+    lsr a
+    lsr a
+    rol controllers
+    dey
+    bne :-
+
+    ldy #8
+:
+    lda $4016
+    lsr a
+    lsr a
+    rol controllers+1
+    dey
+    bne :-
+
+    ldy #8
+:
+    lda $4016
+    lsr a
+    lsr a
+    rol controllers+2
+    dey
+    bne :-
+
+    lda controllers+1
+    eor #$FF
+    sta controllers+1
+
+    rts
+
 MenuItems:
     .asciiz "Controllers"
     .asciiz "Keyboard"
     .asciiz "Family Trainer"
+    .asciiz "Hori Track"
 
 MenuRows:
     ;      Y, X
     .byte 87,  56
     .byte 103, 56
     .byte 119, 56
+    .byte 135, 56
+MenuItemCount = (* - MenuRows) / 2
 
 MenuDestinations:
     .word Init_Controllers
     .word Init_Keyboard
     .word Init_Feet
+    .word Init_Trackball
 
 Palettes:
     ; BG
