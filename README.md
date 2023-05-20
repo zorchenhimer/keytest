@@ -7,6 +7,7 @@ devices and show which inputs are active.
 
 This is an incomplete list of devices on the roadmap.  Devices will only be marked as "completed" if they have been tested on hardware.
 
+- [X] Hori Track trackball
 - [x] Family BASIC Keyboard
 - [x] Family Trainer mat
 - [x] NES Four Score
@@ -15,7 +16,6 @@ This is an incomplete list of devices on the roadmap.  Devices will only be mark
 - [ ] Arkanoid controller
 - [ ] Famicom P2 Mic
 - [ ] Hori 4 Players Adapter
-- [ ] Hori Track trackball (in progress)
 - [ ] Oeka Kids tablet
 - [ ] Power Pad
 - [ ] Zapper
