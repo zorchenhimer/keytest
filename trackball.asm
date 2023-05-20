@@ -1,3 +1,24 @@
+; Hori Track trackball (https://www.nesdev.org/wiki/Hori_Track)
+;
+; The states for both switches on the bottom are sent in the third byte of
+; data.  The Hi/Lo switch will change the values sent in the second byte so
+; the software doesn't need to handle the different speed settings directly.
+; The L/R switch on the other hand only sends its state in the data.  It does
+; not change the orientation of the axes or the D-Pad, this must be done in
+; software.
+;
+; L-mode seems to be the standard mode with UP on the D-Pad facing the ball
+; and with the "Hori Track" text on the front facing the user.
+;
+; Axis data (byte 2):
+; L-mode: YYYY XXXX
+;     Y = Positive = Down = towards D-Pad
+;     X = Positive = Right = towards Start/Select
+; R-mode: XXXX YYYY
+;     X = Positive = Left = towards D-Pad
+;     Y = Positive = Down = towards Start/Select
+;
+; The L/R switch isn't handled by this code.
 
 ; Horizontal sprite positions for the number lines.  Starts at -8
 NumberLinePositions:
@@ -14,6 +35,11 @@ NumberLinePositions:
 TrackballSwVals:
     .asciiz "L R  Lo Hi"
 
+TrackballErrorAddr = $2090
+TrackballErrorText:
+    .asciiz "Not plugged in"
+TrackballErrorTextLen = * - TrackballErrorText
+
 Init_Trackball:
     lda #%1000_0000
     sta PPU_2000
@@ -26,12 +52,9 @@ Init_Trackball:
     jsr ClearScreen
 
     ;; setup stuff
-    lda #$84
-    clc
-    adc #$40
+    lda #$C4
     sta AddressPointer+0
     lda #$20
-    adc #0
     sta AddressPointer+1
 
     lda #.lobyte(ControllerTiles)
@@ -143,6 +166,28 @@ Init_Trackball:
 
 Frame_Trackball:
     jsr ReadTrackball
+
+    ; This should always have a value in D4,D5 (ID bits)
+    ; If not, it's not plugged in.  Don't bother with
+    ; updating the screen.
+    lda controllers+2
+    bne :+
+
+    lda #$FF
+    sta controllers+3
+    jsr QueueTrackballError
+    jsr WaitForNMI
+    jmp Frame_Trackball
+:
+
+    lda controllers+3
+    bpl :+
+    ; Trackball wasn't plugged in, but is now.
+    ; Clear the text from screen.
+    lda #$00
+    sta controllers+3
+    jsr ClearTrackballError
+:
 
     lda #0
     sta TmpX
@@ -351,6 +396,73 @@ ReadTrackball:
     lda controllers+1
     eor #$FF
     sta controllers+1
-
     rts
 
+    lda controllers+2
+    beq :+
+    rts
+
+:   ; Third byte is $00, trackball isn't plugged in.
+    ; Clear axes values
+    sta controllers+1
+    rts
+
+QueueTrackballError:
+    lda #.lobyte(TrackballErrorAddr)
+    sta AddressPointer+0
+    lda #.hibyte(TrackballErrorAddr)
+    sta AddressPointer+1
+
+    ldy #0
+@loop:
+    lda TrackballErrorText, y
+    beq @done
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda AddressPointer+0
+    sta Buffer_AddrLo, x
+
+    lda AddressPointer+1
+    sta Buffer_AddrHi, x
+
+    inc AddressPointer+0
+    bne :+
+    inc AddressPointer+1
+:
+
+    iny
+    jmp @loop
+
+@done:
+    rts
+
+ClearTrackballError:
+    lda #.lobyte(TrackballErrorAddr)
+    sta AddressPointer+0
+    lda #.hibyte(TrackballErrorAddr)
+    sta AddressPointer+1
+
+    ldy #TrackballErrorTextLen
+@loop:
+    lda #$20 ; space character
+    inc BufferIndex
+    ldx BufferIndex
+    sta Buffer_Data, x
+
+    lda AddressPointer+0
+    sta Buffer_AddrLo, x
+
+    lda AddressPointer+1
+    sta Buffer_AddrHi, x
+
+    inc AddressPointer+0
+    bne :+
+    inc AddressPointer+1
+:
+
+    dey
+    bne @loop
+
+    rts
