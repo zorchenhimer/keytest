@@ -1,3 +1,94 @@
+.enum KeyboardKeys
+; Row 0
+kbd_CloseBracket
+kbd_OpenBracket
+kbd_Return
+kbd_F8
+kbd_Stop
+kbd_Yen
+kbd_RightShift
+kbd_Kana
+
+; Row 1
+kbd_SemiColon
+kbd_Colon
+kbd_At
+kbd_F7
+kbd_Caret
+kbd_Dash
+kbd_Slash
+kbd_SpaceSymbol
+
+; Row 2
+kbd_K
+kbd_L
+kbd_O
+kbd_F6
+kbd_0
+kbd_P
+kbd_Comma
+kbd_Period
+
+; Row 3
+kbd_J
+kbd_U
+kbd_I
+kbd_F5
+kbd_8
+kbd_9
+kbd_N
+kbd_M
+
+; Row 4
+kbd_H
+kbd_G
+kbd_Y
+kbd_F4
+kbd_6
+kbd_7
+kbd_V
+kbd_B
+
+; Row 5
+kbd_D
+kbd_R
+kbd_T
+kbd_F3
+kbd_4
+kbd_5
+kbd_C
+kbd_F
+
+; Row 6
+kbd_A
+kbd_S
+kbd_W
+kbd_F2
+kbd_3
+kbd_E
+kbd_Z
+kbd_X
+
+; Row 7
+kbd_Control
+kbd_Q
+kbd_Escape
+kbd_F1
+kbd_2
+kbd_1
+kbd_Graph
+kbd_LeftShift
+
+; Row 8
+kbd_Left
+kbd_Right
+kbd_Up
+kbd_Clear
+kdb_Insert
+kbd_Delete
+kbd_Space
+kbd_Down
+.endenum
 
 Init_Keyboard:
     lda #%1000_0000
