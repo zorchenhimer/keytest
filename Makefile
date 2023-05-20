@@ -8,6 +8,11 @@ CAFLAGS = -g -t nes
 LDFLAGS = -C $(NESCFG) --dbgfile bin/$(NAME).dbg -m bin/$(NAME).map
 
 SOURCES = main.asm \
+		  3d-glasses.asm \
+		  feet.asm \
+		  keyboard.asm \
+		  standard-controllers.asm \
+		  trackball.asm \
 		  controller.i \
 		  keyboard.i \
 		  family-trainer-a.i \
