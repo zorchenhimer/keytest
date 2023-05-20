@@ -167,6 +167,7 @@ ButtonMask: .res 1
 FTWaitVal: .res 1
 
 KeyboardRead: .res 1
+PPU_2000: .res 1
 
 .segment "OAM"
 SpriteZero: .res 4
@@ -181,6 +182,7 @@ controllers_old:        .res 6 ; last frame's buttons
 FeetInput: .res 2
 KeyboardStatus: .res 72
 Trackball: .res 3
+GlassesToggle: .res 1
 
 NMI_Ram: .res 917
 
@@ -254,7 +256,8 @@ NMI_Done:
     sta $2005
     sta $2005
 
-    lda #%1000_0000
+    ;lda #%1000_0000
+    lda PPU_2000
     sta $2000
 
     pla
@@ -462,9 +465,10 @@ DrawKeyboard:
 DrawFeet:
     rts
 
+; Nametable High byte in A
 ClearScreen:
     bit $2002
-    lda #$20
+    ;lda #$20
     sta $2006
     lda #$00
     sta $2006
@@ -563,6 +567,7 @@ RESET:
     sta BufferIndex
 
     lda #%1000_0000
+    sta PPU_2000
     sta $2000
 
     ;lda #%0001_1110
@@ -574,6 +579,7 @@ RESET:
 
     ; TODO: palatte
 
+    lda #$20
     jsr ClearScreen
     jsr DrawMenu
 
@@ -705,11 +711,13 @@ DrawTiledRegion:
 
 Init_Controllers:
     lda #%1000_0000
+    sta PPU_2000
     sta $2000
 
     lda #0
     sta $2001
 
+    lda #$20
     jsr ClearScreen
 
     lda #.lobyte(ControllerTiles)
@@ -857,11 +865,13 @@ UpdateController:
 
 Init_Keyboard:
     lda #%1000_0000
+    sta PPU_2000
     sta $2000
 
     lda #0
     sta $2001
 
+    lda #$20
     jsr ClearScreen
 
     lda #.lobyte(KeyboardTiles)
@@ -1082,11 +1092,13 @@ DrawFeetController:
 
 Init_Feet:
     lda #%1000_0000
+    sta PPU_2000
     sta $2000
 
     lda #0
     sta $2001
 
+    lda #$20
     jsr ClearScreen
 
     ; Draw the controler on screen
@@ -1440,11 +1452,13 @@ TrackballSwVals:
 
 Init_Trackball:
     lda #%1000_0000
+    sta PPU_2000
     sta $2000
 
     lda #0
     sta $2001
 
+    lda #$20
     jsr ClearScreen
 
     ;; setup stuff
@@ -1776,18 +1790,85 @@ ReadTrackball:
 
     rts
 
+Init_3DGlasses:
+    lda #%1000_0000
+    sta PPU_2000
+    sta $2000
+
+    lda #0
+    sta $2001
+
+    lda #$20
+    jsr ClearScreen
+    lda #$24
+    jsr ClearScreen
+
+    lda #$21
+    sta AddressPointer+1
+    lda #$0C
+    sta AddressPointer+0
+    lda #.lobyte(GlassesLeftTiles)
+    sta AddressPointer2+0
+    lda #.hibyte(GlassesLeftTiles)
+    sta AddressPointer2+1
+    jsr DrawTiledRegion
+
+    lda #$25
+    sta AddressPointer+1
+    lda #$0C
+    sta AddressPointer+0
+    lda #.lobyte(GlassesRightTiles)
+    sta AddressPointer2+0
+    lda #.hibyte(GlassesRightTiles)
+    sta AddressPointer2+1
+    jsr DrawTiledRegion
+
+    lda #0
+    sta GlassesToggle
+
+    jsr WaitForNMI
+    lda #%0001_1110
+    sta $2001
+
+Frame_3DGlasses:
+
+    lda GlassesToggle
+    beq :+
+    ; Left
+    ldx #%1000_0000
+    stx PPU_2000
+    ldx #%0000_0010
+    stx $4016
+    jmp :++
+
+:   ; Right
+    ldx #%1000_0001
+    stx PPU_2000
+    ldx #%0000_0000
+    stx $4016
+
+:   eor #$FF
+    sta GlassesToggle
+
+    jsr WaitForNMI
+    jmp Frame_3DGlasses
+
 MenuItems:
     .asciiz "Controllers"
     .asciiz "Keyboard"
     .asciiz "Family Trainer"
     .asciiz "Hori Track"
+    .asciiz "3D Glasses"
 
 MenuRows:
     ;      Y, X
-    .byte 87,  56
-    .byte 103, 56
-    .byte 119, 56
-    .byte 135, 56
+    .repeat 5, i
+    .byte 87+(i*16), 56
+    .endrepeat
+    ;.byte 87,  56
+    ;.byte 103, 56
+    ;.byte 119, 56
+    ;.byte 135, 56
 MenuItemCount = (* - MenuRows) / 2
 
 MenuDestinations:
@@ -1795,6 +1876,7 @@ MenuDestinations:
     .word Init_Keyboard
     .word Init_Feet
     .word Init_Trackball
+    .word Init_3DGlasses
 
 Palettes:
     ; BG
@@ -2179,3 +2261,8 @@ FamilyTrainerTiles_SideA:
     .include "family-trainer-a.i"
 FamilyTrainerTiles_SideB:
     .include "family-trainer-b.i"
+
+GlassesLeftTiles:
+    .include "glasses-left.i"
+GlassesRightTiles:
+    .include "glasses-right.i"

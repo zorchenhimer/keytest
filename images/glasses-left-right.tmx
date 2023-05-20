@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.1" orientation="orthogonal" renderorder="right-down" width="7" height="7" tilewidth="8" tileheight="8" infinite="0" nextlayerid="3" nextobjectid="1">
+ <tileset firstgid="1" source="font.tsx"/>
+ <layer id="1" name="left" width="7" height="7">
+  <data encoding="csv">
+161,161,33,33,33,33,33,
+161,161,33,33,33,33,33,
+161,161,33,33,33,33,33,
+161,161,33,33,33,33,33,
+161,161,33,33,33,33,33,
+161,161,33,33,33,33,33,
+161,161,161,161,161,161,33
+</data>
+ </layer>
+ <layer id="2" name="right" width="7" height="7" visible="0">
+  <data encoding="csv">
+161,161,161,161,161,161,33,
+161,161,33,33,33,161,161,
+161,161,33,33,33,161,161,
+161,161,161,161,161,161,33,
+161,161,33,33,161,161,33,
+161,161,33,33,33,161,161,
+161,161,33,33,33,161,161
+</data>
+ </layer>
+</map>

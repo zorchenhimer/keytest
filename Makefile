@@ -11,7 +11,9 @@ SOURCES = main.asm \
 		  controller.i \
 		  keyboard.i \
 		  family-trainer-a.i \
-		  family-trainer-b.i
+		  family-trainer-b.i \
+		  glasses-left.i \
+		  glasses-right.i
 CHR = font.chr
 
 default: env bin/$(NAME).nes
@@ -48,6 +50,11 @@ family-trainer-a.i: images/family-trainer-split.tmx $(SCRCONV)
 
 family-trainer-b.i: images/family-trainer-split.tmx $(SCRCONV)
 	go run convert-screen.go $< $@ --layer SideB --fill 32
+
+glasses-left.i: images/glasses-left-right.tmx
+	go run convert-screen.go $< $@ --layer left
+glasses-right.i: images/glasses-left-right.tmx
+	go run convert-screen.go $< $@ --layer right
 
 $(CHRUTIL):
 	$(MAKE) -C go-nes/ bin/chrutil$(EXT)
