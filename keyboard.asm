@@ -171,6 +171,7 @@ ReadKeyboard:
     asl a
     asl a
     asl a
+    and #$F0
     sta KeyboardRead
 
     ; col 1
