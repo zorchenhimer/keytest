@@ -9,6 +9,7 @@ This is an incomplete list of devices on the roadmap.  Devices will only be mark
 
 - [X] 3D Glasses
 - [X] Hori Track trackball
+- [X] Oeka Kids tablet
 - [x] Family BASIC Keyboard
 - [x] Family Trainer mat
 - [x] NES Four Score
@@ -16,6 +17,5 @@ This is an incomplete list of devices on the roadmap.  Devices will only be mark
 - [ ] Arkanoid controller
 - [ ] Famicom P2 Mic
 - [ ] Hori 4 Players Adapter
-- [ ] Oeka Kids tablet
 - [ ] Power Pad
 - [ ] Zapper
