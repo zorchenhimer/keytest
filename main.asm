@@ -18,6 +18,8 @@ FALSE = 0
 DEBUG_CONTROLLER_LAYOUT = FALSE
 DEBUG_FEET_LAYOUT       = FALSE
 
+MENU_PPU_ADDR = $2089
+
 .enum ControllerData
 Btn_A
 Btn_B
@@ -301,10 +303,10 @@ WaitForNMI:
 
 ; Menu to select what type of input device
 DrawMenu:
-    lda #$21
+    lda #.hibyte(MENU_PPU_ADDR)
     sta AddressPointer+1
     sta $2006
-    lda #$69
+    lda #.lobyte(MENU_PPU_ADDR)
     sta AddressPointer+0
     sta $2006
     sta TmpX
@@ -608,16 +610,13 @@ MenuItems:
     .asciiz "Family Trainer"
     .asciiz "Hori Track"
     .asciiz "3D Glasses"
+    .asciiz "Oeka Tablet"
 
 MenuRows:
     ;      Y, X
-    .repeat 5, i
-    .byte 87+(i*16), 56
+    .repeat 6, i
+    .byte 31+(i*16), 56
     .endrepeat
-    ;.byte 87,  56
-    ;.byte 103, 56
-    ;.byte 119, 56
-    ;.byte 135, 56
 MenuItemCount = (* - MenuRows) / 2
 
 MenuDestinations:
@@ -626,6 +625,7 @@ MenuDestinations:
     .word Init_Feet
     .word Init_Trackball
     .word Init_3DGlasses
+    .word Init_Tablet
 
 Palettes:
     ; BG
@@ -645,3 +645,4 @@ Palettes:
     .include "keyboard.asm"
     .include "standard-controllers.asm"
     .include "trackball.asm"
+    .include "tablet.asm"

@@ -13,12 +13,14 @@ SOURCES = main.asm \
 		  keyboard.asm \
 		  standard-controllers.asm \
 		  trackball.asm \
+		  tablet.asm \
 		  controller.i \
 		  keyboard.i \
 		  family-trainer-a.i \
 		  family-trainer-b.i \
 		  glasses-left.i \
 		  glasses-right.i
+
 CHR = font.chr
 
 default: env bin/$(NAME).nes
