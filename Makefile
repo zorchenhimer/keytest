@@ -16,6 +16,7 @@ SOURCES = main.asm \
 		  tablet.asm \
 		  controller.i \
 		  keyboard.i \
+		  titler.asm \
 		  family-trainer-a.i \
 		  family-trainer-b.i \
 		  glasses-left.i \

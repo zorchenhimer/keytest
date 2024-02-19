@@ -611,10 +611,11 @@ MenuItems:
     .asciiz "Hori Track"
     .asciiz "3D Glasses"
     .asciiz "Oeka Tablet"
+    .asciiz "Sharp Titler"
 
 MenuRows:
     ;      Y, X
-    .repeat 6, i
+    .repeat 7, i
     .byte 31+(i*16), 56
     .endrepeat
 MenuItemCount = (* - MenuRows) / 2
@@ -626,6 +627,7 @@ MenuDestinations:
     .word Init_Trackball
     .word Init_3DGlasses
     .word Init_Tablet
+    .word Init_Titler
 
 Palettes:
     ; BG
@@ -646,3 +648,4 @@ Palettes:
     .include "standard-controllers.asm"
     .include "trackball.asm"
     .include "tablet.asm"
+    .include "titler.asm"
