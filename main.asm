@@ -101,6 +101,10 @@ NMI_Ram: .res 917
 .segment "PAGE0"
 
 IRQ:
+    ldx #$01
+    lda #$00
+    sta $4016
+    lda $4017
     rti
 
 ; TODO: move all of NMI to ram.  instead of lda zp,
@@ -473,6 +477,9 @@ RESET:
 
     lda #$20
     jsr ClearScreen
+    lda #$24
+    jsr ClearScreen
+
     jsr DrawMenu
 
 ;    ; Fill up the draw buffer with some data

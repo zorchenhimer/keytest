@@ -13,6 +13,7 @@ This is an incomplete list of devices on the roadmap.  Devices will only be mark
 - [x] Family BASIC Keyboard
 - [x] Family Trainer mat
 - [x] NES Four Score
+- [x] Sharp Famicom Titler
 - [x] Standard P1 and P2 controllers
 - [ ] Arkanoid controller
 - [ ] Famicom P2 Mic

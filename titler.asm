@@ -1,3 +1,49 @@
+; Button statuses are read one bit at a time from
+; $4016.1 for 16 bits of data, MSB first.
+; Two sets of strobes are required for each byte of data.
+; For the first byte:
+;   $00, $02, $00
+;   $00, $01, $00
+; and for the second byte:
+;   $00, $04, $00
+;   $00, $01, $00
+; These strobes are written out to $4016.
+;
+; Physical Button Layout:
+; $0004  $0400  $0800  $0008  $8000
+; $0002  $0200  $0010  $1000  $0080
+; $0001  $0100  $0020  $2000  $0040 $4000
+;
+; These buttons are only active if the switch on the side
+; of the titler labeled 文字入力 (character entry) is set
+; to 入 (on/enter).
+;
+; The switch underneath these buttons (labeled
+; スーパーインポーズ (superimpose)) is not readable by
+; the console (afaik).
+
+; The touchpad utilizes a hardware generated IRQ.  Reading
+; the coordinates is done by first strobing $4016 with 0,
+; 2, & 0, a single time followed by the read sequence
+; twice.  Write 4 to $4016 then enable and wait for the
+; IRQ to trigger.  Once it does, write 0 to $4016 and read
+; $4017 for the value.
+;
+; $4017 must be read twice, once for each coordinate.
+; Writing 4 and 0 to $4016 must happen before each read of
+; the coordinate data.
+;
+; The data for each coordinate is a 5 bit unsigned number
+; from the lower five bits of the read from $4017. The
+; zero coordinate is the bottom right of the touch pad.
+; When nothing is detected on the touch pad, both
+; coordinates will be $1F.  The lowest observed coordinate
+; is $01 and the highest $1E.
+;
+; The touchpad IRQ will only fire if the switch on the
+; side of the console labeled 文字入力 (character entry)
+; is set to 入 (on/enter).
+
 .pushseg
 .segment "BSS"
 titler_ButtonsA: .res 1
@@ -7,6 +53,7 @@ titler_frame: .res 1
 .popseg
 
 Titler_DataStart = $20A6
+Titler_PadStart = $2226
 
 ; addresses for each button on screen.
 TITLER_BTN_PPU_START = $2106
@@ -27,39 +74,23 @@ TITLER_BTN_COUNT = (* - Titler_Buttons_PPU)/2
 ; Buttons
 ; ByteA
 TBTN_5           = $80
-TBTN_Execute     = $40
-TBTN_Handwritten = $20
-TBTN_Insert      = $10
+TBTN_Execute     = $40  ; 実行
+TBTN_Handwritten = $20  ; 手書き
+TBTN_Insert      = $10  ; 挿入
 TBTN_3           = $08
 TBTN_2           = $04
-TBTN_Inverted    = $02
-TBTN_PrevScreen  = $01
+TBTN_Inverted    = $02  ; 反転
+TBTN_PrevScreen  = $01  ; 前画面
 
 ; ByteB
-TBTN_Delete     = $80
-TBTN_Kanji      = $40
-TBTN_Symbols    = $20
-TBTN_TextColor  = $10
-TBTN_4          = $08
-TBTN_1          = $04
-TBTN_Typeface   = $02
-TBTN_Menu       = $01
-
-; Physical Button Layout:
-; $0004  $0400  $0800  $0008  $8000
-; $0002  $0200  $0010  $1000  $0080
-; $0001  $0100  $0020  $2000  $0040 $4000
-
-; Button statuses are read one bit at a time from
-; $4016.1 for 16 bits of data, MSB first.
-; Two sets of strobes are required for each byte of data.
-; For the first byte:
-;   $00, $02, $00
-;   $00, $01, $00
-; and for the second byte:
-;   $00, $04, $00
-;   $00, $01, $00
-; These strobes are written out to $4016.
+TBTN_Delete      = $80  ; 削除
+TBTN_Kanji       = $40  ; 漢字
+TBTN_Symbols     = $20  ; 記号
+TBTN_TextColor   = $10  ; 文字色
+TBTN_4           = $08
+TBTN_1           = $04
+TBTN_Typeface    = $02  ; 書体
+TBTN_Menu        = $01  ; メニュー
 
 ; a "Word" table of masks, in physical order
 Titler_ButtonMasks:
@@ -96,7 +127,7 @@ Init_Titler:
     ldx #0
     ldy #0
     ;sta BufferIndex
-@loop:
+@btnLoop:
     tya
     asl a
     tax
@@ -113,7 +144,36 @@ Init_Titler:
 
     iny
     cpy #TITLER_BTN_COUNT+1
-    bne @loop
+    bne @btnLoop
+
+; touchpad box
+    lda #.lobyte(Titler_PadStart)
+    sta AddressPointer+0
+    lda #.hibyte(Titler_PadStart)
+    sta AddressPointer+1
+
+    ldx #4
+@padLoop:
+    lda AddressPointer+1
+    sta $2006
+    lda AddressPointer+0
+    sta $2006
+
+    lda #$A0
+    ldy #4
+@padInner:
+    sta $2007
+    dey
+    bne @padInner
+
+    clc
+    lda AddressPointer+0
+    adc #32
+    sta AddressPointer+0
+    bcc :+
+    inc AddressPointer+1
+:   dex
+    bne @padLoop
 
 ; setup a frame counter
     lda #0
@@ -148,7 +208,7 @@ Frame_Titler:
     lda #0
     sta TmpX
     sta TmpY
-    jmp @ascii
+    ;jmp @ascii
 
     ldx #$00
     ldy #$02
@@ -160,12 +220,14 @@ Frame_Titler:
     sta $4016
 
     jsr WaitForX
+    and #$1F
     sta TmpX
 
     ldx #$00
     lda #$04
     sta $4016
     jsr WaitForX
+    and #$1F
     sta TmpY
 
 @ascii:
@@ -199,7 +261,7 @@ Frame_Titler:
     and titler_ButtonsB
     bne @on
     lda #$00
-    sta TmpX
+    sta TmpZ
 
 @next:
     lda Titler_Buttons_PPU+0, y
@@ -208,7 +270,7 @@ Frame_Titler:
     lda Titler_Buttons_PPU+1, y
     sta Buffer_AddrHi, x
 
-    lda TmpX
+    lda TmpZ
     sta Buffer_Data, x
     inc BufferIndex
 
@@ -219,13 +281,14 @@ Frame_Titler:
 
 @on:
     lda #$80
-    sta TmpX
+    sta TmpZ
     jmp @next
 
 @btnDone:
 
     ldy BufferIndex
-    lda titler_ButtonsA
+    ;lda titler_ButtonsA
+    lda TmpX
     lsr a
     lsr a
     lsr a
@@ -242,7 +305,8 @@ Frame_Titler:
     inc BufferIndex
     iny
 
-    lda titler_ButtonsA
+    ;lda titler_ButtonsA
+    lda TmpX
     and #$0F
     tax
     lda HexAscii, x
@@ -256,8 +320,8 @@ Frame_Titler:
     inc BufferIndex
     iny
 
-    ;lda TmpY
-    lda titler_ButtonsB
+    ;lda titler_ButtonsB
+    lda TmpY
     lsr a
     lsr a
     lsr a
@@ -274,7 +338,8 @@ Frame_Titler:
     inc BufferIndex
     iny
 
-    lda titler_ButtonsB
+    ;lda titler_ButtonsB
+    lda TmpY
     and #$0F
     tax
     lda HexAscii, x
@@ -286,6 +351,32 @@ Frame_Titler:
     sta Buffer_AddrHi, y
 
     inc BufferIndex
+
+; A sprite for the touchpad visualization.
+; Subtract the coordinates from the bottom right
+; origin point to get an accurate representation.
+    lda #$1F
+    eor TmpX
+    beq @noPad
+
+    lda #$2B
+    jmp :+
+@noPad:
+    lda #' '
+:   sta SpriteZero+1
+
+    lda #0
+    sta SpriteZero+2
+
+    sec
+    lda #76
+    sbc TmpX
+    sta SpriteZero+3
+
+    sec
+    lda #163
+    sbc TmpY
+    sta SpriteZero+0
 
     jsr WaitForNMI
     jmp Frame_Titler
