@@ -619,13 +619,7 @@ MenuItems:
     .asciiz "3D Glasses"
     .asciiz "Oeka Tablet"
     .asciiz "Sharp Titler"
-
-MenuRows:
-    ;      Y, X
-    .repeat 7, i
-    .byte 31+(i*16), 56
-    .endrepeat
-MenuItemCount = (* - MenuRows) / 2
+    .asciiz "HyperShot"
 
 MenuDestinations:
     .word Init_Controllers
@@ -635,6 +629,15 @@ MenuDestinations:
     .word Init_3DGlasses
     .word Init_Tablet
     .word Init_Titler
+    .word Init_Hyper
+MenuItemCount = (* - MenuDestinations) / 2
+
+MenuRows:
+    ;      Y, X
+    .repeat MenuItemCount, i
+    .byte 31+(i*16), 56
+    .endrepeat
+;MenuItemCount = (* - MenuRows) / 2
 
 Palettes:
     ; BG
@@ -656,3 +659,4 @@ Palettes:
     .include "trackball.asm"
     .include "tablet.asm"
     .include "titler.asm"
+    .include "hypershot.asm"

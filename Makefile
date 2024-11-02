@@ -14,6 +14,7 @@ SOURCES = main.asm \
 		  standard-controllers.asm \
 		  trackball.asm \
 		  tablet.asm \
+		  hypershot.asm \
 		  controller.i \
 		  keyboard.i \
 		  titler.asm \
