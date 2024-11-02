@@ -15,6 +15,7 @@ SOURCES = main.asm \
 		  trackball.asm \
 		  tablet.asm \
 		  hypershot.asm \
+		  mahjong.asm \
 		  controller.i \
 		  keyboard.i \
 		  titler.asm \
@@ -23,12 +24,15 @@ SOURCES = main.asm \
 		  glasses-left.i \
 		  glasses-right.i
 
-CHR = font.chr
+CHR = font.chr font_lower.chr
 
 default: env bin/$(NAME).nes
 env: $(CHRUTIL) bin/
 bin/:
-	mkdir bin
+	-mkdir bin
+
+send: default
+	./edlink bin/$(NAME).nes
 
 clean:
 	-rm bin/* *.chr *.i
@@ -46,6 +50,9 @@ images/%.bmp: images/%.aseprite
 	aseprite -b $< --save-as $@
 
 font.chr: images/font.bmp
+	$(CHRUTIL) -o $@ $<
+
+font_lower.chr: images/font_lower.bmp
 	$(CHRUTIL) -o $@ $<
 
 controller.i: images/controller.tmx $(SCRCONV)

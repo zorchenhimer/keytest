@@ -97,6 +97,7 @@ NMI_Ram: .res 917
     .incbin "font.chr"
 
 .segment "CHR1"
+    .incbin "font_lower.chr"
 
 .segment "PAGE0"
 
@@ -620,6 +621,7 @@ MenuItems:
     .asciiz "Oeka Tablet"
     .asciiz "Sharp Titler"
     .asciiz "HyperShot"
+    .asciiz "Capcom Mahjong"
 
 MenuDestinations:
     .word Init_Controllers
@@ -630,6 +632,7 @@ MenuDestinations:
     .word Init_Tablet
     .word Init_Titler
     .word Init_Hyper
+    .word Init_Mahjong
 MenuItemCount = (* - MenuDestinations) / 2
 
 MenuRows:
@@ -660,3 +663,4 @@ Palettes:
     .include "tablet.asm"
     .include "titler.asm"
     .include "hypershot.asm"
+    .include "mahjong.asm"
