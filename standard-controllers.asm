@@ -65,7 +65,7 @@ Init_Controllers:
     iny
     inx
     inx
-    cpx #7
+    cpx #11
     bcc @txtStart
 
 .if (DEBUG_CONTROLLER_LAYOUT = TRUE)
@@ -101,6 +101,12 @@ Frame_Controllers:
     jsr UpdateController
 
     ldx #3
+    jsr UpdateController
+
+    ldx #4
+    jsr UpdateController
+
+    ldx #5
     jsr UpdateController
 
     jsr WaitForNMI
@@ -160,22 +166,30 @@ ControllerLabels:
     .asciiz "Player 2"
     .asciiz "Player 3"
     .asciiz "Player 4"
+    .asciiz "Expansion 1"
+    .asciiz "Expansion 2"
 
 Ctrl1_LabelAddr = $2084
 Ctrl2_LabelAddr = $2093
 Ctrl3_LabelAddr = $2184
 Ctrl4_LabelAddr = $2193
+Ctrl5_LabelAddr = $2284
+Ctrl6_LabelAddr = $2293
 
 ControllerLabelAddrs:
     .word Ctrl1_LabelAddr
     .word Ctrl2_LabelAddr
     .word Ctrl3_LabelAddr
     .word Ctrl4_LabelAddr
+    .word Ctrl5_LabelAddr
+    .word Ctrl6_LabelAddr
 
 Ctrl1_Addr = Ctrl1_LabelAddr + $40
 Ctrl2_Addr = Ctrl2_LabelAddr + $40
 Ctrl3_Addr = Ctrl3_LabelAddr + $40
 Ctrl4_Addr = Ctrl4_LabelAddr + $40
+Ctrl5_Addr = Ctrl5_LabelAddr + $40
+Ctrl6_Addr = Ctrl6_LabelAddr + $40
 
 ; PPU Address lookup tables for controller buttons
 ControllerLookupLo:
@@ -219,6 +233,26 @@ ControllerLookupLo:
     .byte .lobyte(Ctrl4_Addr + (1*32+0))  ; Left
     .byte .lobyte(Ctrl4_Addr + (1*32+2))  ; Right
 
+    ; Expansion 1
+    .byte .lobyte(Ctrl5_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl5_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl5_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl5_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl5_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl5_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl5_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl5_Addr + (1*32+2))  ; Right
+
+    ; Expansion 2
+    .byte .lobyte(Ctrl6_Addr + (1*32+8))  ; A
+    .byte .lobyte(Ctrl6_Addr + (1*32+7))  ; B
+    .byte .lobyte(Ctrl6_Addr + (1*32+4))  ; Select
+    .byte .lobyte(Ctrl6_Addr + (1*32+5))  ; Start
+    .byte .lobyte(Ctrl6_Addr + (0*32+1))  ; Up
+    .byte .lobyte(Ctrl6_Addr + (2*32+1))  ; Down
+    .byte .lobyte(Ctrl6_Addr + (1*32+0))  ; Left
+    .byte .lobyte(Ctrl6_Addr + (1*32+2))  ; Right
+
 ControllerLookupHi:
     ; Controller 1
     .byte .hibyte(Ctrl1_Addr + (1*32+8))  ; A
@@ -259,6 +293,26 @@ ControllerLookupHi:
     .byte .hibyte(Ctrl4_Addr + (2*32+1))  ; Down
     .byte .hibyte(Ctrl4_Addr + (1*32+0))  ; Left
     .byte .hibyte(Ctrl4_Addr + (1*32+2))  ; Right
+
+    ; Expansion 1
+    .byte .hibyte(Ctrl5_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl5_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl5_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl5_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl5_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl5_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl5_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl5_Addr + (1*32+2))  ; Right
+
+    ; Expansion 2
+    .byte .hibyte(Ctrl6_Addr + (1*32+8))  ; A
+    .byte .hibyte(Ctrl6_Addr + (1*32+7))  ; B
+    .byte .hibyte(Ctrl6_Addr + (1*32+4))  ; Select
+    .byte .hibyte(Ctrl6_Addr + (1*32+5))  ; Start
+    .byte .hibyte(Ctrl6_Addr + (0*32+1))  ; Up
+    .byte .hibyte(Ctrl6_Addr + (2*32+1))  ; Down
+    .byte .hibyte(Ctrl6_Addr + (1*32+0))  ; Left
+    .byte .hibyte(Ctrl6_Addr + (1*32+2))  ; Right
 
 ControllerTiles:
     .include "controller.i"
