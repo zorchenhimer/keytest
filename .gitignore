@@ -1,3 +1,5 @@
 bin/
 *.chr
 *.i
+*.tiled-session
+edlink
