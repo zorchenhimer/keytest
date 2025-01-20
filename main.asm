@@ -622,6 +622,7 @@ MenuItems:
     .asciiz "Sharp Titler"
     .asciiz "HyperShot"
     .asciiz "Capcom Mahjong"
+    .asciiz "Network Controller"
 
 MenuDestinations:
     .word Init_Controllers
@@ -633,6 +634,7 @@ MenuDestinations:
     .word Init_Titler
     .word Init_Hyper
     .word Init_Mahjong
+    .word Init_Network
 MenuItemCount = (* - MenuDestinations) / 2
 
 MenuRows:
@@ -664,3 +666,4 @@ Palettes:
     .include "titler.asm"
     .include "hypershot.asm"
     .include "mahjong.asm"
+    .include "network.asm"

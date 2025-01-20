@@ -19,10 +19,12 @@ SOURCES = main.asm \
 		  controller.i \
 		  keyboard.i \
 		  titler.asm \
+		  network.asm \
 		  family-trainer-a.i \
 		  family-trainer-b.i \
 		  glasses-left.i \
-		  glasses-right.i
+		  glasses-right.i \
+		  network.i
 
 CHR = font.chr font_lower.chr
 
@@ -54,6 +56,9 @@ font.chr: images/font.bmp
 
 font_lower.chr: images/font_lower.bmp
 	$(CHRUTIL) -o $@ $<
+
+network.i: images/network-controller_lg.tmx $(SCRCONV)
+	go run convert-screen.go $< $@ --fill 32
 
 controller.i: images/controller.tmx $(SCRCONV)
 	go run convert-screen.go $< $@ --fill 32
