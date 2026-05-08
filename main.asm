@@ -42,6 +42,7 @@ BUTTON_RIGHT    = 1 << 0
 
 .segment "ZEROPAGE"
 Sleeping: .res 1
+SleepingIrq: .res 1
 
 TmpX: .res 1
 TmpY: .res 1
@@ -56,6 +57,7 @@ AddressPointer3: .res 2
 MenuSelection: .res 1
 
 NMILoopPointer: .res 2
+IRQHandler:     .res 2
 
 BufferIndex:    .res 1  ; doubles as size; $FF = empty
 Buffer_AddrLo:  .res 72
@@ -102,11 +104,18 @@ NMI_Ram: .res 917
 .segment "PAGE0"
 
 IRQ:
-    ldx #$01
-    lda #$00
-    sta $4016
-    lda $4017
+    pha
+    lda IRQHandler+1
+    beq @done
+    jmp (IRQHandler)
+    lda #$FF
+    sta SleepingIrq
+@done:
+    pla
     rti
+
+BareIRQ:
+    rts
 
 ; TODO: move all of NMI to ram.  instead of lda zp,
 ;       lda #imm and write the buffer values
@@ -304,6 +313,16 @@ WaitForNMI:
     bpl :-
     lda #0
     sta Sleeping
+    rts
+
+WaitForIrq:
+    lda IRQHandler+1
+    beq @done
+:   bit Sleeping
+    bpl :-
+    lda #0
+    sta Sleeping
+@done:
     rts
 
 ; Menu to select what type of input device

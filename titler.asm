@@ -48,7 +48,9 @@
 .segment "BSS"
 titler_ButtonsA: .res 1
 titler_ButtonsB: .res 1
-titler_frame: .res 1
+titler_frame:    .res 1
+
+titler_IrqVal:   .res 1
 
 .popseg
 
@@ -112,6 +114,13 @@ Titler_ButtonMasks:
     .byte TBTN_Handwritten, $00
     .byte $00, TBTN_Kanji
     .byte TBTN_Execute, $00
+
+IRQ_Titler:
+    lda #$00
+    sta $4016
+    lda $4017
+    sta titler_IrqVal
+    rts
 
 Init_Titler:
     lda #%1000_0000
@@ -197,6 +206,12 @@ Init_Titler:
     sta Sprites+(0*4)+1
     sta Sprites+(1*4)+1
 
+    ; The Titler's hardware generates the IRQ, not the mapper
+    lda #.lobyte(IRQ_Titler)
+    sta IRQHandler+0
+    lda #.hibyte(IRQ_Titler)
+    sta IRQHandler+1
+
     jsr WaitForNMI
     lda #%0001_1110
     sta $2001
@@ -208,8 +223,8 @@ Frame_Titler:
     lda #0
     sta TmpX
     sta TmpY
-    ;jmp @ascii
 
+    ; Strobe for the touch pad
     ldx #$00
     ldy #$02
     stx $4016
@@ -219,14 +234,16 @@ Frame_Titler:
     lda #$04
     sta $4016
 
-    jsr WaitForX
+    ;jsr WaitForTitlerIrq
+    jsr WaitForIrq
+    lda titler_IrqVal
     and #$1F
     sta TmpX
 
     ldx #$00
     lda #$04
     sta $4016
-    jsr WaitForX
+    jsr WaitForTitlerIrq
     and #$1F
     sta TmpY
 
@@ -381,7 +398,7 @@ Frame_Titler:
     jsr WaitForNMI
     jmp Frame_Titler
 
-WaitForX:
+WaitForTitlerIrq:
     cli
 @loop:
     cpx #$00
