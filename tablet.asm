@@ -75,9 +75,7 @@ TabletPalettes:
     .byte $0F, $20, $2A, $00
     .byte $0F, $20, $2A, $00
 
-; AddressPointer  points to text data
-; AddressPointer2 PPU address to draw at
-DrawText:
+DrawText_tablet:
     txa
     asl a
     tax
@@ -201,16 +199,16 @@ Init_Tablet:
     jsr ClearScreen
 
     ldx #0
-    jsr DrawText
+    jsr DrawText_tablet
 
     ldx #1
-    jsr DrawText
+    jsr DrawText_tablet
 
     ldx #2
-    jsr DrawText
+    jsr DrawText_tablet
 
     ldx #3
-    jsr DrawText
+    jsr DrawText_tablet
 
     lda #31
     sta Sprites+(4*0)+0

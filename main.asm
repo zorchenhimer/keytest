@@ -10,7 +10,6 @@ nes2end
 
 .feature leading_dot_in_identifiers
 .feature underline_in_numbers
-.feature addrsize
 
 TRUE  = 1
 FALSE = 0
@@ -39,6 +38,20 @@ BUTTON_UP       = 1 << 3
 BUTTON_DOWN     = 1 << 2
 BUTTON_LEFT     = 1 << 1
 BUTTON_RIGHT    = 1 << 0
+
+.macro macDrawText data, addr
+    lda #.lobyte(data)
+    sta AddressPointer+0
+    lda #.hibyte(data)
+    sta AddressPointer+1
+
+    lda #.lobyte(addr)
+    sta AddressPointer2+0
+    lda #.hibyte(addr)
+    sta AddressPointer2+1
+
+    jsr DrawText
+.endmacro
 
 .segment "ZEROPAGE"
 Sleeping: .res 1
@@ -626,6 +639,24 @@ DrawTiledRegion:
     ldx TmpX
     dec TmpY
     bne @loop
+    rts
+
+; AddressPointer  points to text data
+; AddressPointer2 PPU address to draw at
+DrawText:
+    lda AddressPointer2+1
+    sta $2006
+    lda AddressPointer2+0
+    sta $2006
+
+    ldy #0
+@loop:
+    lda (AddressPointer), y
+    beq @done
+    sta $2007
+    iny
+    jmp @loop
+@done:
     rts
 
 HexAscii:
