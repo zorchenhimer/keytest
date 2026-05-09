@@ -1,5 +1,6 @@
+.scope Controllers
 
-Init_Controllers:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -68,7 +69,7 @@ Init_Controllers:
     cpx #11
     bcc @txtStart
 
-.if (DEBUG_CONTROLLER_LAYOUT = TRUE)
+.if (::DEBUG_CONTROLLER_LAYOUT = ::TRUE)
     ; populate buttons for debugging
     ldx #0
     ldy #$A0 ; space on second table (grey square)
@@ -88,7 +89,7 @@ Init_Controllers:
     lda #%0001_1110
     sta $2001
 
-Frame_Controllers:
+Frame:
     jsr ReadControllers
 
     ldx #0
@@ -110,7 +111,7 @@ Frame_Controllers:
     jsr UpdateController
 
     jsr WaitForNMI
-    jmp Frame_Controllers
+    jmp Frame
 
 ; ControllerID in X
 UpdateController:
@@ -316,3 +317,5 @@ ControllerLookupHi:
 
 ControllerTiles:
     .include "controller.i"
+
+.endscope

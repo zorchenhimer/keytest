@@ -1,3 +1,5 @@
+.scope Trackball
+
 ; Hori Track trackball (https://www.nesdev.org/wiki/Hori_Track)
 ;
 ; The states for both switches on the bottom are sent in the third byte of
@@ -40,7 +42,7 @@ TrackballErrorText:
     .asciiz "Not plugged in"
 TrackballErrorTextLen = * - TrackballErrorText
 
-Init_Trackball:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -57,9 +59,9 @@ Init_Trackball:
     lda #$20
     sta AddressPointer+1
 
-    lda #.lobyte(ControllerTiles)
+    lda #.lobyte(Controllers::ControllerTiles)
     sta AddressPointer2+0
-    lda #.hibyte(ControllerTiles)
+    lda #.hibyte(Controllers::ControllerTiles)
     sta AddressPointer2+1
     jsr DrawTiledRegion
 
@@ -164,7 +166,7 @@ Init_Trackball:
     lda #%0001_1110
     sta $2001
 
-Frame_Trackball:
+Frame:
     jsr ReadTrackball
 
     ; This should always have a value in D4,D5 (ID bits)
@@ -177,7 +179,7 @@ Frame_Trackball:
     sta controllers+3
     jsr QueueTrackballError
     jsr WaitForNMI
-    jmp Frame_Trackball
+    jmp Frame
 :
 
     lda controllers+3
@@ -199,15 +201,15 @@ Frame_Trackball:
 :   lda #$00
 
 :   ldy TmpX
-    ora ControllerTileLookup, y
+    ora Controllers::ControllerTileLookup, y
 
     inc BufferIndex
     ldx BufferIndex
     sta Buffer_Data, x
 
-    lda ControllerLookupLo, y
+    lda Controllers::ControllerLookupLo, y
     sta Buffer_AddrLo, x
-    lda ControllerLookupHi, y
+    lda Controllers::ControllerLookupHi, y
     sta Buffer_AddrHi, x
 
     inc TmpX
@@ -358,7 +360,7 @@ Frame_Trackball:
     sta Sprites+(4*4)+3
 :
     jsr WaitForNMI
-    jmp Frame_Trackball
+    jmp Frame
 
 ReadTrackball:
     lda #1
@@ -466,3 +468,5 @@ ClearTrackballError:
     bne @loop
 
     rts
+
+.endscope

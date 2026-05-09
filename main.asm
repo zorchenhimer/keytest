@@ -83,12 +83,12 @@ ButtonMask: .res 1
 ; routine
 FTWaitVal: .res 1
 
-KeyboardRead: .res 1
 PPU_2000: .res 1
 
 .segment "OAM"
 SpriteZero: .res 4
 Sprites: .res (64*4)-4
+
 .segment "BSS"
 
 controllers:            .res 6 ; buttons currently pressed
@@ -97,11 +97,10 @@ controllers_released:   .res 6 ; buttons released this frame
 controllers_old:        .res 6 ; last frame's buttons
 
 FeetInput: .res 2
-KeyboardStatus: .res 72
 Trackball: .res 3
 GlassesToggle: .res 1
 
-NMI_Ram: .res 917
+;NMI_Ram: .res 917
 
 .segment "VECTORS"
     .word NMI
@@ -675,16 +674,16 @@ MenuItems:
     .asciiz "Network Controller"
 
 MenuDestinations:
-    .word Init_Controllers
-    .word Init_Keyboard
-    .word Init_Feet
-    .word Init_Trackball
-    .word Init_3DGlasses
-    .word Init_Tablet
-    .word Init_Titler
-    .word Init_Hyper
-    .word Init_Mahjong
-    .word Init_Network
+    .word Controllers::Init
+    .word Keyboard::Init
+    .word Feet::Init
+    .word Trackball::Init
+    .word Glasses::Init
+    .word Tablet::Init
+    .word Titler::Init
+    .word Hyper::Init
+    .word Mahjong::Init
+    .word Network::Init
 MenuItemCount = (* - MenuDestinations) / 2
 
 MenuRows:

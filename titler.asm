@@ -1,3 +1,4 @@
+.scope Titler
 ; Button statuses are read one bit at a time from
 ; $4016.1 for 16 bits of data, MSB first.
 ; Two sets of strobes are required for each byte of data.
@@ -122,7 +123,7 @@ IRQ_Titler:
     sta titler_IrqVal
     rts
 
-Init_Titler:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -216,7 +217,7 @@ Init_Titler:
     lda #%0001_1110
     sta $2001
 
-Frame_Titler:
+Frame:
 
     jsr titler_ReadButtons
 
@@ -396,7 +397,7 @@ Frame_Titler:
     sta SpriteZero+0
 
     jsr WaitForNMI
-    jmp Frame_Titler
+    jmp Frame
 
 WaitForTitlerIrq:
     cli
@@ -451,3 +452,5 @@ titler_ReadButtons:
     bne @outer
 
     rts
+
+.endscope

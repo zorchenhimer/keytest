@@ -3,3 +3,4 @@ bin/
 *.i
 *.tiled-session
 edlink
+convert-screen/convert-screen

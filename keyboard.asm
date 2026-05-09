@@ -1,3 +1,5 @@
+.scope Keyboard
+
 .enum KeyboardKeys
 ; Row 0
 kbd_CloseBracket
@@ -90,7 +92,16 @@ kbd_Space
 kbd_Down
 .endenum
 
-Init_Keyboard:
+.pushseg
+.segment "ZEROPAGE"
+KeyboardRead: .res 1
+
+.segment "BSS"
+KeyboardStatus: .res 72
+
+.popseg
+
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -116,7 +127,7 @@ Init_Keyboard:
     lda #%0001_1110
     sta $2001
 
-Frame_Keyboard:
+Frame:
     jsr ReadKeyboard
 
     ldx #0
@@ -144,7 +155,7 @@ Frame_Keyboard:
     bne @loop
 
     jsr WaitForNMI
-    jmp Frame_Keyboard
+    jmp Frame
 
 ReadKeyboard:
     lda #0
@@ -448,3 +459,5 @@ KeyboardTileLookup:
 
 KeyboardTiles:
     .include "keyboard.i"
+
+.endscope

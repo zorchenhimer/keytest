@@ -1,4 +1,6 @@
-Init_3DGlasses:
+.scope Glasses
+
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -38,7 +40,7 @@ Init_3DGlasses:
     lda #%0001_1110
     sta $2001
 
-Frame_3DGlasses:
+Frame:
 
     lda GlassesToggle
     beq :+
@@ -59,9 +61,11 @@ Frame_3DGlasses:
     sta GlassesToggle
 
     jsr WaitForNMI
-    jmp Frame_3DGlasses
+    jmp Frame
 
 GlassesLeftTiles:
     .include "glasses-left.i"
 GlassesRightTiles:
     .include "glasses-right.i"
+
+.endscope

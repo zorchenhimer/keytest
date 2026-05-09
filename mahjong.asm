@@ -1,4 +1,5 @@
-Init_Mahjong:
+.scope Mahjong
+Init:
     lda #%1001_0000
     sta PPU_2000
     sta $2000
@@ -9,21 +10,7 @@ Init_Mahjong:
     lda #$20
     jsr ClearScreen
 
-    lda #.hibyte(Mahjong_LabelAddr)
-    sta AddressPointer+1
-    sta $2006
-    lda #.lobyte(Mahjong_LabelAddr)
-    sta AddressPointer+0
-    sta $2006
-
-    ldy #0
-@txtLoop:
-    lda MahjongText, y
-    beq @next
-    iny
-    sta $2007
-    jmp @txtLoop
-@next:
+    macDrawText Title, TitleAddr
 
     clc
     lda AddressPointer+0
@@ -65,9 +52,9 @@ Init_Mahjong:
     cpx #14
     bne @btnLoop2
 
-    lda #.hibyte(Mahjong_LabelAddr+$40)
+    lda #.hibyte(TitleAddr+$40)
     sta AddressPointer+1
-    lda #.lobyte(Mahjong_LabelAddr+$40)
+    lda #.lobyte(TitleAddr+$40)
     sta AddressPointer+0
 
     ; Letter Row
@@ -301,8 +288,8 @@ ReadMahjongController:
 
     rts
 
-Mahjong_LabelAddr = $2083
-MahjongText:
+TitleAddr = $2083
+Title:
     .asciiz "Capcom Mahjong Controller"
 
 MahjongButtons:
@@ -320,3 +307,5 @@ MahjongButtons2:
     .byte $0A, $0B ; チー
     .byte $0C, $0D ; リーチ
     .byte $0E, $0F ; ロン
+
+.endscope

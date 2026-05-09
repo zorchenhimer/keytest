@@ -1,3 +1,4 @@
+.scope Feet
 
 FEET_COL0 = %0001_0000
 FEET_COL1 = %0000_1000
@@ -7,7 +8,7 @@ FEET_COL3 = %0000_0010
 FEET_PPU_ADDR_A = $20C6
 FEET_PPU_ADDR_B = $20D3
 
-Init_Feet:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -44,7 +45,7 @@ Init_Feet:
 
     jsr DrawFeetController
 
-.if (DEBUG_FEET_LAYOUT = TRUE)
+.if (::DEBUG_FEET_LAYOUT = ::TRUE)
     ldx #0
     ldy #$A0
 :
@@ -80,7 +81,7 @@ Init_Feet:
     lda #%0001_1110
     sta $2001
 
-Frame_Feet:
+Frame:
     jsr ReadFamilyTrainer
 
     ldy #0
@@ -191,7 +192,7 @@ Frame_Feet:
     sta Buffer_AddrLo, x
 
     jsr WaitForNMI
-    jmp Frame_Feet
+    jmp Frame
 
 ReadFamilyTrainer:
     lda #0
@@ -476,3 +477,5 @@ FamilyTrainerTiles_SideA:
     .include "family-trainer-a.i"
 FamilyTrainerTiles_SideB:
     .include "family-trainer-b.i"
+
+.endscope

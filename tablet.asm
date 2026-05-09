@@ -1,3 +1,4 @@
+.scope Tablet
 ; Oeka Kids Tablet
 ;
 ; Data is read from the tablet one bit at a time
@@ -174,7 +175,7 @@ tablet_UpdateSprites:
     sta Sprites+(4*4)+1
     rts
 
-Init_Tablet:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -266,13 +267,13 @@ Init_Tablet:
     lda #%0001_1110
     sta $2001
 
-Frame_Tablet:
+Frame:
 
     jsr ReadTablet
 
     jsr tablet_UpdateSprites
     jsr WaitForNMI
-    jmp Frame_Tablet
+    jmp Frame
 
 ; After sending a Zero strobe, wait for
 ; it to be acknowledged by the tablet.
@@ -378,3 +379,4 @@ tablet_ReadStart:
 :   dex
     bne @loop
     rts
+.endscope

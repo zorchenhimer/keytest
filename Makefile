@@ -1,7 +1,7 @@
 .PHONY: default env clean cleanall chr
 
 CHRUTIL = go-nes/bin/chrutil
-SCRCONV = convert-screen.go
+SCRCONV = convert-screen/convert-screen
 NAME = keytest
 NESCFG = nes_nrom.cfg
 CAFLAGS = -g -t nes
@@ -28,7 +28,7 @@ SOURCES = main.asm \
 
 CHR = font.chr font_lower.chr
 
-default: env bin/$(NAME).nes
+default: $(SCRCONV) env bin/$(NAME).nes
 env: $(CHRUTIL) bin/
 bin/:
 	-mkdir bin
@@ -41,6 +41,9 @@ clean:
 
 cleanall: clean
 	-rm images/*.bmp
+
+convert-screen/convert-screen: convert-screen/*.go
+	cd convert-screen && go build -o convert-screen
 
 bin/$(NAME).nes: bin/main.o
 	ld65 $(LDFLAGS) -o $@ $^
@@ -58,24 +61,24 @@ font_lower.chr: images/font_lower.bmp
 	$(CHRUTIL) -o $@ $<
 
 network.i: images/network-controller_lg.tmx $(SCRCONV)
-	go run convert-screen.go $< $@ --fill 32
+	$(SCRCONV) $< $@ --fill 32
 
 controller.i: images/controller.tmx $(SCRCONV)
-	go run convert-screen.go $< $@ --fill 32
+	$(SCRCONV) $< $@ --fill 32
 
 keyboard.i: images/keyboard.tmx $(SCRCONV)
-	go run convert-screen.go $< $@ --layer main --fill 32
+	$(SCRCONV) $< $@ --layer main --fill 32
 
 family-trainer-a.i: images/family-trainer-split.tmx $(SCRCONV)
-	go run convert-screen.go $< $@ --layer SideA --fill 32
+	$(SCRCONV) $< $@ --layer SideA --fill 32
 
 family-trainer-b.i: images/family-trainer-split.tmx $(SCRCONV)
-	go run convert-screen.go $< $@ --layer SideB --fill 32
+	$(SCRCONV) $< $@ --layer SideB --fill 32
 
 glasses-left.i: images/glasses-left-right.tmx
-	go run convert-screen.go $< $@ --layer left
+	$(SCRCONV) $< $@ --layer left
 glasses-right.i: images/glasses-left-right.tmx
-	go run convert-screen.go $< $@ --layer right
+	$(SCRCONV) $< $@ --layer right
 
 $(CHRUTIL):
 	$(MAKE) -C go-nes/ bin/chrutil$(EXT)

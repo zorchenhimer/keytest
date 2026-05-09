@@ -1,5 +1,6 @@
+.scope Hyper
 
-Init_Hyper:
+Init:
     lda #%1000_0000
     sta PPU_2000
     sta $2000
@@ -94,7 +95,7 @@ Init_Hyper:
     lda #%0001_1110
     sta $2001
 
-Frame_Hyper:
+Frame:
     jsr Hyper_ReadControllers
 
     ;ldx #0
@@ -115,7 +116,7 @@ Frame_Hyper:
     bne @loop
 
     jsr WaitForNMI
-    jmp Frame_Hyper
+    jmp Frame
 
 Hyper_ReadControllers:
     lda #0
@@ -151,3 +152,5 @@ Hyper2_LabelAddr = $2093
 HyperLabelAddrs:
     .word Hyper1_LabelAddr
     .word Hyper2_LabelAddr
+
+.endscope
