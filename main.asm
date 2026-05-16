@@ -321,19 +321,19 @@ ReadControllers:
 
 WaitForNMI:
     jsr PrepareNmiPointer
-:   bit Sleeping
-    bpl :-
     lda #0
     sta Sleeping
+:   bit Sleeping
+    bpl :-
     rts
 
 WaitForIrq:
     lda IRQHandler+1
     beq @done
-:   bit Sleeping
-    bpl :-
     lda #0
-    sta Sleeping
+    sta SleepingIrq
+:   bit SleepingIrq
+    bpl :-
 @done:
     rts
 
