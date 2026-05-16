@@ -232,9 +232,10 @@ ReadControllersExpansion:
 
 ReadControllers:
     ; Freeze input
-    lda #1
+    ; bit 1 is set for TurboFile stuff
+    lda #%0000_0011
     sta $4016
-    lda #0
+    lda #%0000_0010
     sta $4016
 
     ldx #0
@@ -656,6 +657,10 @@ DrawText:
     iny
     jmp @loop
 @done:
+
+    lda #$00
+    sta $2005
+    sta $2005
     rts
 
 HexAscii:
@@ -672,6 +677,7 @@ MenuItems:
     .asciiz "HyperShot"
     .asciiz "Capcom Mahjong"
     .asciiz "Network Controller"
+    .asciiz "Turbo File"
 
 MenuDestinations:
     .word Controllers::Init
@@ -684,6 +690,7 @@ MenuDestinations:
     .word Hyper::Init
     .word Mahjong::Init
     .word Network::Init
+    .word Turbo::Init
 MenuItemCount = (* - MenuDestinations) / 2
 
 MenuRows:
@@ -716,3 +723,4 @@ Palettes:
     .include "hypershot.asm"
     .include "mahjong.asm"
     .include "network.asm"
+    .include "turbo.asm"

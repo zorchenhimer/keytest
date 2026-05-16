@@ -24,7 +24,8 @@ SOURCES = main.asm \
 		  family-trainer-b.i \
 		  glasses-left.i \
 		  glasses-right.i \
-		  network.i
+		  network.i \
+		  turbo.asm
 
 CHR = font.chr font_lower.chr
 
