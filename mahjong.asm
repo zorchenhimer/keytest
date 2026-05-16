@@ -104,9 +104,6 @@ Init:
 Frame_Mahjong:
     jsr ReadMahjongController
 
-    lda #28
-    sta BufferIndex
-
 ; A through H
     ldx #0
     lda controllers+2
@@ -171,6 +168,8 @@ Frame_Mahjong:
 
     cpx #28
     bne @readLoopC
+
+    stx BufferIndex
 
     jsr WaitForNMI
 
