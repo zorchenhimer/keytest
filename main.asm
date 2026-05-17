@@ -723,14 +723,16 @@ DrawText:
     ldy BufferIndex
     bpl :+
     ldy #0
+    sty BufferIndex
+    jmp :++
+:
+    inc BufferIndex
+    iny
 :
     lda AddressPointer2+1
     sta Buffer_AddrHi, y
     lda AddressPointer2+0
     sta Buffer_AddrLo, y
-
-    sty BufferIndex
-    inc BufferIndex
 
     ldx #0
 @find:
@@ -819,9 +821,9 @@ MenuRows:
 Palettes:
     ; BG
     .byte $0F, $20, $2A, $00
-    .byte $0F, $20, $2A, $00
-    .byte $0F, $20, $2A, $00
-    .byte $0F, $20, $2A, $00
+    .byte $0F, $20, $0F, $0F
+    .byte $0F, $0F, $20, $0F
+    .byte $0F, $0F, $0F, $0F
 
     ; Sprite
     .byte $0F, $20, $2A, $00

@@ -27,16 +27,28 @@ Init:
     macDrawText_Direct textA, $2065
     macDrawText_Direct textB, $2065+32
 
-    ldx #.addrsize(Buffer_Data)-1
-    lda #0
-@loop:
-    sta Buffer_Data, y
-    dex
-    bpl @loop
+    macDrawText_Direct text_Write, $2078
+    macDrawText_Direct text_Read, $2079
 
-    jsr WaitForNMI
+    lda #.lobyte($23C6)
+    sta $2006
+    lda #.hibyte($23C6)
+    sta $2006
+
+    lda Attr_None
+    sta $2007
+
+;    ldx #.addrsize(Buffer_Data)-1
+;    lda #0
+;@loop:
+;    sta Buffer_Data, y
+;    dex
+;    bpl @loop
+
+;    jsr WaitForNMI
     lda #%0001_1110
     sta $2001
+    jsr WaitForNMI
 
     lda #$00
     sta AddressPointer3+0
@@ -61,14 +73,27 @@ Frame:
     jsr ResetAddr
     jmp @frameDone
 
-;:   lda controllers_pressed+0
-;    and #BUTTON_START
-;    beq :+
-;    jsr WriteTest
-;    jmp @frameDone
+:   lda controllers_pressed+0
+    and #BUTTON_START
+    beq :+
+    jsr WriteTest
+    jmp @frameDone
 :
 
 @frameDone:
+
+    lda #.lobyte($23C6)
+    sta Buffer_AddrLo+0
+    lda #.hibyte($23C6)
+    sta Buffer_AddrHi+0
+
+    lda Attr_None
+    sta Buffer_Data+0
+    lda #0
+    sta BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 
@@ -147,7 +172,8 @@ ReadData:
     adc #0
     sta AddressPointer3+1
 
-    rts
+    jmp WaitForNMI
+    ;rts
 
 AddrToAscii:
     lda AddressPointer3+1
@@ -250,6 +276,22 @@ DataToAscii:
     rts
 
 WriteTest:
+    jsr WaitForNMI
+
+    lda #.lobyte($23C6)
+    sta Buffer_AddrLo+0
+    lda #.hibyte($23C6)
+    sta Buffer_AddrHi+0
+
+    lda Attr_Write
+    sta Buffer_Data+0
+    lda #0
+    sta BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
+    jsr WaitForNMI
+
     ; reset address
     lda #$00
     sta $4016
@@ -266,14 +308,48 @@ WriteTest:
     dex
     bne :-
 
+    ;lda #.lobyte(TestFile_Size)
+    ;sta AddressPointer+0
+    ;lda #.hibyte(TestFile_Size)
+    ;sta AddressPointer+1
+
+    lda #.lobyte(TestFile)
+    sta AddressPointer+0
+    lda #.hibyte(TestFile)
+    sta AddressPointer+1
+
     ldy #0
 @loop:
-    lda TestData, y
-    beq @done
+    ;lda TestData, y
+    lda (AddressPointer), y
     jsr WriteByte
-    iny
-    jmp @loop
-@done:
+
+    inc AddressPointer+0
+    bne :+
+    inc AddressPointer+1
+:
+    lda AddressPointer+1
+    cmp #.hibyte(TestFile+TestFile_Size)
+    bne @loop
+    lda AddressPointer+0
+    cmp #.lobyte(TestFile+TestFile_Size)
+    bne @loop
+
+    jsr WaitForNMI
+
+    lda #.lobyte($23C6)
+    sta Buffer_AddrLo+0
+    lda #.hibyte($23C6)
+    sta Buffer_AddrHi+0
+
+    lda Attr_None
+    sta Buffer_Data+0
+    lda #0
+    sta BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
+    jsr WaitForNMI
 
     jsr ResetAddr
     jsr ReadData
@@ -299,6 +375,22 @@ WriteByte:
     rts
 
 ReadFile:
+    jsr WaitForNMI
+
+    lda #.lobyte($23C6)
+    sta Buffer_AddrLo+0
+    lda #.hibyte($23C6)
+    sta Buffer_AddrHi+0
+
+    lda Attr_Read
+    sta Buffer_Data+0
+    lda #0
+    sta BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
+    jsr WaitForNMI
+
     jsr ResetAddr
     jsr ReadByte ; addr $0000
 
@@ -321,6 +413,14 @@ ReadFile:
 
     macDrawText AddrBuffer, $21E5
 
+    sec
+    lda AddressPointer3+0
+    sbc #18
+    sta AddressPointer3+0
+    lda AddressPointer3+1
+    sbc #0
+    sta AddressPointer3+1
+
     ldx #0
 @loop:
     jsr ReadByte
@@ -339,6 +439,71 @@ ReadFile:
 
     macDrawText DataBufferA, $2205
 
+    jsr WaitForNMI
+
+    lda #0
+    sta AddressPointer+0
+    sta AddressPointer+1
+@checksum:
+    jsr ReadByte
+    ; calculate checksum
+    clc
+    adc AddressPointer+0
+    sta AddressPointer+0
+    lda AddressPointer+1
+    adc #0
+    sta AddressPointer+1
+
+    ; decrement length
+    sec
+    lda AddressPointer3+0
+    sbc #1
+    sta AddressPointer3+0
+    lda AddressPointer3+1
+    sbc #0
+    sta AddressPointer3+1
+
+    cmp #$00
+    bne @checksum
+    lda AddressPointer3+0
+    cmp #$00
+    bne @checksum
+
+    ; read checksum
+    jsr ReadByte
+    sta AddressPointer2+0
+    jsr ReadByte
+    sta AddressPointer2+1
+
+    ; validate checksum
+    cmp AddressPointer+1
+    bne @fail
+    lda AddressPointer+0
+    cmp AddressPointer2+0
+    bne @fail
+
+    macDrawText text_Ok, $2225
+    jmp :+
+@fail:
+    macDrawText text_NotOk, $2225
+:
+
+    lda #NMI_Action::String
+    sta NMIAction
+    jsr WaitForNMI
+
+    lda #.lobyte($23C6)
+    sta Buffer_AddrLo+0
+    lda #.hibyte($23C6)
+    sta Buffer_AddrHi+0
+
+    lda Attr_Read
+    sta Buffer_Data+0
+    lda #0
+    sta BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jmp WaitForNMI
     ;rts
 
@@ -347,7 +512,28 @@ textA:
 textB:
     .asciiz "Press B to reset"
 
+text_Write:
+    .byte 'W', $00
+text_Read:
+    .byte 'R' | $80, $00
+text_Ok:
+    .asciiz "Checksum OK"
+text_NotOk:
+    .asciiz "Checksum FAILED"
+
+Attr_None:
+    .byte $FF
+
+Attr_Write:
+    .byte $55
+Attr_Read:
+    .byte $AA
+
 TestData:
     .asciiz "01234567"
+
+TestFile:
+    .incbin "turbo.file.bin"
+TestFile_Size = * - TestFile
 
 .endscope
