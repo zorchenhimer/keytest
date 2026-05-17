@@ -1,5 +1,11 @@
 .scope Turbo
 
+.pushseg
+.segment "BSS"
+Filename: .res 16
+
+.popseg
+
 Init:
     lda #%1000_0000
     sta PPU_2000
@@ -31,6 +37,8 @@ Init:
     lda #$00
     sta AddressPointer3+0
     sta AddressPointer3+1
+
+    jsr ReadFile
 
     jsr ResetAddr
 
@@ -114,7 +122,6 @@ ReadData:
     ldy #0
 @loop:
     jsr ReadByte
-    lda TmpX
     sta Buffer_Data, y
     iny
     cpy #16
@@ -207,6 +214,7 @@ ReadByte:
     ror TmpX  ; store
     .endrepeat
 
+    lda TmpX
     rts
 
 DataToAscii:
@@ -304,94 +312,50 @@ WriteByte:
     bne @loop
     rts
 
-;ReadControllers:
-;    ; Freeze input
-;    lda #%0000_0011
-;    sta $4016
-;    lda #%0000_0010
-;    sta $4016
-;
-;    ldx #0
-;@oldloop:
-;    lda controllers, x
-;    sta controllers_old, x
-;    inx
-;    cpx #6 ; FIXME: make this value a constant
-;    bne @oldloop
-;
-;    ldx #0
-;    ldy #8
-;@player1:
-;    lda $4016
-;    lsr A              ; Bit0 -> Carry
-;    rol controllers, x ; Bit0 <- Carry
-;    ; famicom expanion controller
-;    lsr A
-;    rol controllers+4, x
-;    dey
-;    bne @player1
-;
-;    ldx #2
-;    ldy #8
-;@player3:
-;    lda $4016
-;    lsr A              ; Bit0 -> Carry
-;    rol controllers, x ; Bit0 <- Carry
-;    dey
-;    bne @player3
-;
-;    ldx #1
-;    ldy #8
-;@player2:
-;    lda $4017
-;    lsr A              ; Bit0 -> Carry
-;    rol controllers, x ; Bit0 <- Carry
-;    ; famicom expanion controller
-;    lsr A
-;    rol controllers+4, x
-;    dey
-;    bne @player2
-;
-;    ldx #3
-;    ldy #8
-;@player4:
-;    lda $4017
-;    lsr A              ; Bit0 -> Carry
-;    rol controllers, x ; Bit0 <- Carry
-;    dey
-;    bne @player4
-;
-;    ; If a controller has all buttons pressed, it
-;    ; doesn't exist.  This will happen if the
-;    ; four score isn't plugged in.
-;    ldx #0
-;@pressedLoop:
-;    lda controllers, x
-;    eor #$FF
-;    bne :+
-;    ; no controller here
-;    lda #0
-;    sta controllers, x
-;    sta controllers_old, x
-;    sta controllers_pressed, x
-;    sta controllers_released, x
-;    jmp :++
-;
-;:   lda controllers, x
-;    eor controllers_old, x
-;    and controllers, x
-;    sta controllers_pressed, x
-;
-;    lda controllers, x
-;    eor controllers_old, x
-;    and controllers_old, x
-;    sta controllers_released, x
-;:
-;    inx
-;    cpx #6
-;    bne @pressedLoop
-;
-;    rts
+ReadFile:
+    jsr ResetAddr
+    jsr ReadByte ; addr $0000
+
+    jsr ReadByte
+    cmp #'A'
+    beq :+
+    rts
+:
+    jsr ReadByte
+    cmp #'B'
+    beq :+
+    rts
+:
+
+    jsr ReadByte
+    sta AddressPointer3+0
+    jsr ReadByte
+    sta AddressPointer3+1
+    jsr AddrToAscii
+
+    ldx #0
+@loop:
+    jsr ReadByte
+    beq @done
+    cmp #$01
+    beq @done
+
+    sta Buffer_Data, x
+    inx
+    cpx #16
+    bne @loop
+@done:
+
+    lda #0
+    sta Buffer_Data, x
+
+    jsr WaitForNMI
+    macDrawText Buffer_Data, $2205
+
+    jsr WaitForNMI
+    macDrawText Buffer_AddrLo, $21E5
+
+    rts
 
 textA:
     .asciiz "Press A to read"
