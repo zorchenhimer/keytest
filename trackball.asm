@@ -178,6 +178,8 @@ Frame:
     lda #$FF
     sta controllers+3
     jsr QueueTrackballError
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 :
@@ -359,6 +361,8 @@ Frame:
     lda #104
     sta Sprites+(4*4)+3
 :
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 

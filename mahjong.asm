@@ -10,7 +10,7 @@ Init:
     lda #$20
     jsr ClearScreen
 
-    macDrawText Title, TitleAddr
+    macDrawText_Direct Title, TitleAddr
 
     clc
     lda AddressPointer+0
@@ -170,6 +170,9 @@ Frame_Mahjong:
     bne @readLoopC
 
     stx BufferIndex
+
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
 
     jsr WaitForNMI
 

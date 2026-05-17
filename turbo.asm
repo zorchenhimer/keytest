@@ -3,6 +3,10 @@
 .pushseg
 .segment "BSS"
 Filename: .res 16
+AddrBuffer: .res 5
+DataBufferA: .res 32
+DataBufferB: .res 16
+DataBufferC: .res 16
 
 .popseg
 
@@ -20,8 +24,8 @@ Init:
     lda #$20
     jsr ClearScreen
 
-    macDrawText textA, $2065
-    macDrawText textB, $2065+32
+    macDrawText_Direct textA, $2065
+    macDrawText_Direct textB, $2065+32
 
     ldx #.addrsize(Buffer_Data)-1
     lda #0
@@ -41,6 +45,7 @@ Init:
     jsr ReadFile
 
     jsr ResetAddr
+    jsr WaitForNMI
 
 Frame:
     jsr ReadControllers
@@ -56,11 +61,11 @@ Frame:
     jsr ResetAddr
     jmp @frameDone
 
-:   lda controllers_pressed+0
-    and #BUTTON_START
-    beq :+
-    jsr WriteTest
-    jmp @frameDone
+;:   lda controllers_pressed+0
+;    and #BUTTON_START
+;    beq :+
+;    jsr WriteTest
+;    jmp @frameDone
 :
 
 @frameDone:
@@ -79,8 +84,7 @@ ResetAddr:
 
     jsr AddrToAscii
 
-    jsr WaitForNMI
-    macDrawText Buffer_AddrLo, $20C5
+    macDrawText AddrBuffer, $20C5
 
     rts
 
@@ -122,35 +126,18 @@ ReadData:
     ldy #0
 @loop:
     jsr ReadByte
-    sta Buffer_Data, y
+    sta DataBufferA, y
     iny
     cpy #16
     bne @loop
 
     jsr DataToAscii
 
-    jsr WaitForNMI
-    macDrawText Buffer_Data, $2105
-
-    clc
-    lda AddressPointer2+0
-    adc #32
-    sta AddressPointer2+0
-    lda AddressPointer2+1
-    adc #0
-    sta AddressPointer2+1
-
-    clc
-    lda AddressPointer+0
-    adc #17
-    sta AddressPointer+0
-    lda AddressPointer+1
-    adc #0
-    sta AddressPointer+1
-    jsr DrawText
+    macDrawText DataBufferA, $2105
+    macDrawText DataBufferA+17, $2105+32
 
     jsr AddrToAscii
-    macDrawText Buffer_AddrLo, $20C5
+    macDrawText AddrBuffer, $20C5
 
     clc
     lda AddressPointer3+0
@@ -170,13 +157,13 @@ AddrToAscii:
     lsr a
     tax
     lda HexAscii, x
-    sta Buffer_AddrLo+0
+    sta AddrBuffer+0
 
     lda AddressPointer3+1
     and #$0F
     tax
     lda HexAscii, x
-    sta Buffer_AddrLo+1
+    sta AddrBuffer+1
 
     lda AddressPointer3+0
     lsr a
@@ -185,18 +172,17 @@ AddrToAscii:
     lsr a
     tax
     lda HexAscii, x
-    sta Buffer_AddrLo+2
+    sta AddrBuffer+2
 
     lda AddressPointer3+0
     and #$0F
     tax
     lda HexAscii, x
-    sta Buffer_AddrLo+3
+    sta AddrBuffer+3
 
     lda #00
-    sta Buffer_AddrLo+4
-    jmp WaitForNMI
-    ;rts
+    sta AddrBuffer+4
+    rts
 
 ReadByte:
     .repeat 8
@@ -220,7 +206,7 @@ ReadByte:
 DataToAscii:
     ldy #0
 @loop:
-    lda Buffer_Data, y
+    lda DataBufferA, y
     lsr a
     lsr a
     lsr a
@@ -228,13 +214,13 @@ DataToAscii:
     and #$0F
     tax
     lda HexAscii, x
-    sta Buffer_Data+32, y
+    sta DataBufferB, y
 
-    lda Buffer_Data, y
+    lda DataBufferA, y
     and #$0F
     tax
     lda HexAscii, x
-    sta Buffer_Data+48, y
+    sta DataBufferC, y
     iny
     cpy #16
     bne @loop
@@ -242,24 +228,24 @@ DataToAscii:
     ldy #0
     ldx #0
 @loop2:
-    lda Buffer_Data+32, y
-    sta Buffer_Data, x
+    lda DataBufferB, y
+    sta DataBufferA, x
     inx
-    lda Buffer_Data+48, y
-    sta Buffer_Data, x
+    lda DataBufferC, y
+    sta DataBufferA, x
     inx
     iny
     cpy #8
     bne :+
     lda #0
-    sta Buffer_Data, x
+    sta DataBufferA, x
     inx
 :
     cpy #16
     bne @loop2
 
     lda #0
-    sta Buffer_Data, x
+    sta DataBufferA, x
 
     rts
 
@@ -333,6 +319,8 @@ ReadFile:
     sta AddressPointer3+1
     jsr AddrToAscii
 
+    macDrawText AddrBuffer, $21E5
+
     ldx #0
 @loop:
     jsr ReadByte
@@ -340,22 +328,19 @@ ReadFile:
     cmp #$01
     beq @done
 
-    sta Buffer_Data, x
+    sta DataBufferA, x
     inx
     cpx #16
     bne @loop
 @done:
 
     lda #0
-    sta Buffer_Data, x
+    sta DataBufferA, x
 
-    jsr WaitForNMI
-    macDrawText Buffer_Data, $2205
+    macDrawText DataBufferA, $2205
 
-    jsr WaitForNMI
-    macDrawText Buffer_AddrLo, $21E5
-
-    rts
+    jmp WaitForNMI
+    ;rts
 
 textA:
     .asciiz "Press A to read"

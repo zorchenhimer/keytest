@@ -110,6 +110,9 @@ Frame:
     ldx #5
     jsr UpdateController
 
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
+
     jsr WaitForNMI
     jmp Frame
 

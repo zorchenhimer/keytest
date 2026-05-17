@@ -191,6 +191,8 @@ Frame:
     lda #$6F
     sta Buffer_AddrLo, x
 
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 

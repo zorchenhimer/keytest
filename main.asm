@@ -39,6 +39,20 @@ BUTTON_DOWN     = 1 << 2
 BUTTON_LEFT     = 1 << 1
 BUTTON_RIGHT    = 1 << 0
 
+.macro macDrawText_Direct data, addr
+    lda #.lobyte(data)
+    sta AddressPointer+0
+    lda #.hibyte(data)
+    sta AddressPointer+1
+
+    lda #.lobyte(addr)
+    sta AddressPointer2+0
+    lda #.hibyte(addr)
+    sta AddressPointer2+1
+
+    jsr DrawText_Direct
+.endmacro
+
 .macro macDrawText data, addr
     lda #.lobyte(data)
     sta AddressPointer+0
@@ -99,6 +113,13 @@ controllers_old:        .res 6 ; last frame's buttons
 FeetInput: .res 2
 Trackball: .res 3
 GlassesToggle: .res 1
+NMIAction: .res 1
+
+.enum NMI_Action
+Nothing
+UnrolledBytes
+String
+.endenum
 
 ;NMI_Ram: .res 917
 
@@ -195,6 +216,39 @@ NMI_Done:
     pla
     rti
 
+NMI_String:
+    ldy #0
+    ldx #0
+@loop:
+    lda BufferIndex
+    bmi @done
+    lda Buffer_AddrHi, y
+    cmp #$20
+    bcc @next
+    sta $2006
+    lda Buffer_AddrLo, y
+    sta $2006
+
+@data:
+    lda Buffer_Data, x
+    beq @next
+    sta $2007
+    inx
+    cpx #.sizeof(Buffer_Data)
+    beq @done
+    jmp @data
+
+@next:
+    inx
+    iny
+    dec BufferIndex
+    jmp @loop
+
+@done:
+    lda #$FF
+    sta BufferIndex
+    jmp NMI_Done
+
 UnrolledLookup_hi:
     .repeat 72, i
     .byte .hibyte(.ident(.sprintf("ul_%02d", i)))
@@ -206,6 +260,13 @@ UnrolledLookup_lo:
     .endrepeat
 
 PrepareNmiPointer:
+    lda NMIAction
+    beq @empty
+    cmp #NMI_Action::String
+    beq @string
+    cmp #NMI_Action::UnrolledBytes
+    bne @empty
+
     lda BufferIndex
     bmi @empty
 
@@ -214,6 +275,9 @@ PrepareNmiPointer:
     sta NMILoopPointer+0
     lda UnrolledLookup_hi, x
     sta NMILoopPointer+1
+
+    lda #NMI_Action::Nothing
+    sta NMIAction
     rts
 
 @empty:
@@ -224,6 +288,18 @@ PrepareNmiPointer:
 
     lda #$FF
     sta BufferIndex
+    lda #NMI_Action::Nothing
+    sta NMIAction
+    rts
+
+@string:
+    lda #.lobyte(NMI_String)
+    sta NMILoopPointer+0
+    lda #.hibyte(NMI_String)
+    sta NMILoopPointer+1
+
+    lda #NMI_Action::Nothing
+    sta NMIAction
     rts
 
 ; Famicom expansion port controllers
@@ -644,6 +720,50 @@ DrawTiledRegion:
 ; AddressPointer  points to text data
 ; AddressPointer2 PPU address to draw at
 DrawText:
+    ldy BufferIndex
+    bpl :+
+    ldy #0
+:
+    lda AddressPointer2+1
+    sta Buffer_AddrHi, y
+    lda AddressPointer2+0
+    sta Buffer_AddrLo, y
+
+    sty BufferIndex
+    inc BufferIndex
+
+    ldx #0
+@find:
+    cpy #0
+    beq @found
+@strFind:
+    lda Buffer_Data, x
+    beq @nextFind
+    inx
+    jmp @strFind
+
+@nextFind:
+    inx
+    dey
+    jmp @find
+
+@found:
+
+    ldy #0
+@loop:
+    lda (AddressPointer), y
+    sta Buffer_Data, x
+    beq @done
+    iny
+    inx
+    jmp @loop
+@done:
+    lda #NMI_Action::String
+    sta NMIAction
+    ;jmp WaitForNMI
+    rts
+
+DrawText_Direct:
     lda AddressPointer2+1
     sta $2006
     lda AddressPointer2+0
@@ -657,10 +777,6 @@ DrawText:
     iny
     jmp @loop
 @done:
-
-    lda #$00
-    sta $2005
-    sta $2005
     rts
 
 HexAscii:

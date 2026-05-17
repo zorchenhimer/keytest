@@ -115,6 +115,8 @@ Frame:
     cpx #4
     bne @loop
 
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 

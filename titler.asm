@@ -396,6 +396,8 @@ Frame:
     sbc TmpY
     sta SpriteZero+0
 
+    lda #NMI_Action::UnrolledBytes
+    sta NMIAction
     jsr WaitForNMI
     jmp Frame
 

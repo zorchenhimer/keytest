@@ -12,7 +12,7 @@ Init:
     lda #$20
     jsr ClearScreen
 
-    macDrawText Network_Label, LabelAddr
+    macDrawText_Direct Network_Label, LabelAddr
 
     lda #.lobyte(NetworkTiles)
     sta AddressPointer2+0
