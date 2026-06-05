@@ -25,7 +25,8 @@ SOURCES = main.asm \
 		  glasses-left.i \
 		  glasses-right.i \
 		  network.i \
-		  turbo.asm
+		  turbo.asm \
+		  arkanoid.asm
 
 CHR = font.chr font_lower.chr
 

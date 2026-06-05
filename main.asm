@@ -796,6 +796,7 @@ MenuItems:
     .asciiz "Capcom Mahjong"
     .asciiz "Network Controller"
     .asciiz "Turbo File"
+    .asciiz "Arkanoid I Controller"
 
 MenuDestinations:
     .word Controllers::Init
@@ -809,6 +810,7 @@ MenuDestinations:
     .word Mahjong::Init
     .word Network::Init
     .word Turbo::Init
+    .word Arkanoid::Init
 MenuItemCount = (* - MenuDestinations) / 2
 
 MenuRows:
@@ -842,3 +844,4 @@ Palettes:
     .include "mahjong.asm"
     .include "network.asm"
     .include "turbo.asm"
+    .include "arkanoid.asm"
