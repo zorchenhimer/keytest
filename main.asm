@@ -99,6 +99,9 @@ FTWaitVal: .res 1
 
 PPU_2000: .res 1
 
+nmi_custom: .res 2
+;nmi_HexTmp: .res 4
+
 .segment "OAM"
 SpriteZero: .res 4
 Sprites: .res (64*4)-4
@@ -115,10 +118,14 @@ Trackball: .res 3
 GlassesToggle: .res 1
 NMIAction: .res 1
 
+Bin_Input: .res 3
+Bin_Tiles: .res 6
+
 .enum NMI_Action
 Nothing
 UnrolledBytes
 String
+Pointer
 .endenum
 
 ;NMI_Ram: .res 917
@@ -193,10 +200,15 @@ UnrolledLoop:
 
 NMI_Done:
 
+    lda NMIAction
+    cmp #NMI_Action::Pointer
+    beq :+
+
     lda #.lobyte(NMI_Done)
     sta NMILoopPointer+0
     lda #.hibyte(NMI_Done)
     sta NMILoopPointer+1
+:
 
     lda #$FF
     sta BufferIndex
@@ -249,6 +261,12 @@ NMI_String:
     sta BufferIndex
     jmp NMI_Done
 
+NMI_Pointer:
+    jsr :+
+    jmp NMI_Done
+
+:   jmp (nmi_custom)
+
 UnrolledLookup_hi:
     .repeat 72, i
     .byte .hibyte(.ident(.sprintf("ul_%02d", i)))
@@ -262,6 +280,8 @@ UnrolledLookup_lo:
 PrepareNmiPointer:
     lda NMIAction
     beq @empty
+    cmp #NMI_Action::Pointer
+    beq @pointer
     cmp #NMI_Action::String
     beq @string
     cmp #NMI_Action::UnrolledBytes
@@ -300,6 +320,14 @@ PrepareNmiPointer:
 
     lda #NMI_Action::Nothing
     sta NMIAction
+    rts
+
+; dereferences a pointer and draws that
+@pointer:
+    lda #.lobyte(NMI_Pointer)
+    sta NMILoopPointer+0
+    lda #.hibyte(NMI_Pointer)
+    sta NMILoopPointer+1
     rts
 
 ; Famicom expansion port controllers
@@ -780,6 +808,72 @@ DrawText_Direct:
     jmp @loop
 @done:
     rts
+
+BinToDec:
+    ; binary to ascii
+    lda #4
+    sta TmpX ; digit index
+    ldx #0   ; ASCII index
+
+binJmp:
+    lda #'0'
+    .repeat .sizeof(Bin_Tiles), i
+    sta Bin_Tiles+i
+    .endrepeat
+
+@binLoop:
+    ldy TmpX ; get index into DecimalPlaces
+    lda Mult3, y
+
+    tay
+    lda Bin_Input+2
+    cmp DecimalPlaces+2, y
+    bcc @binNext
+    bne @binSub
+
+    lda Bin_Input+1
+    cmp DecimalPlaces+1, y
+    bcc @binNext
+    bne @binSub
+
+    lda Bin_Input+0
+    cmp DecimalPlaces+0, y
+    bcc @binNext
+
+@binSub:
+    ; the subtractions
+    sec
+    .repeat .sizeof(Bin_Input), i
+    lda Bin_Input+i
+    sbc DecimalPlaces+i, y
+    sta Bin_Input+i
+    .endrepeat
+    inc Bin_Tiles, x
+    jmp @binLoop
+
+@binNext:
+    ; next digit
+    inx
+    dec TmpX
+    bpl @binLoop
+
+    ; one's place
+    lda Bin_Input+0
+    ora #'0'
+    sta Bin_Tiles+5
+    rts
+
+DecimalPlaces:
+    .byte $0A, $00, $00 ; 10
+    .byte $64, $00, $00 ; 100
+    .byte $E8, $03, $00 ; 1000
+    .byte $10, $27, $00 ; 10000
+    .byte $A0, $86, $01 ; 100000
+
+Mult3:
+    .repeat 5, i
+    .byte (i)*3
+    .endrepeat
 
 HexAscii:
     .byte "0123456789ABCDEF"

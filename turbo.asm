@@ -8,6 +8,10 @@ DataBufferA: .res 32
 DataBufferB: .res 16
 DataBufferC: .res 16
 
+ReadErrors: .res 2
+StateText: .res 10
+NextPattern: .res 1
+
 .popseg
 
 Init:
@@ -76,7 +80,8 @@ Frame:
 :   lda controllers_pressed+0
     and #BUTTON_START
     beq :+
-    jsr WriteTest
+    ;jsr WriteTest
+    jsr PatternTest
     jmp @frameDone
 :
 
@@ -96,6 +101,338 @@ Frame:
     sta NMIAction
     jsr WaitForNMI
     jmp Frame
+
+PatternTest:
+
+    jsr WaitForNMI
+
+    lda #%1000_0000
+    sta PPU_2000
+    sta $2000
+
+    lda #0
+    sta $2001
+
+    lda #$20
+    jsr ClearScreen
+
+    macDrawText_Direct text_PatternAA, $2065
+
+    lda #%0001_1110
+    sta $2001
+    jsr WaitForNMI
+
+    lda #0
+    sta ReadErrors+0
+    sta ReadErrors+1
+    sta Bin_Input+0
+    sta Bin_Input+1
+    sta Bin_Input+2
+    jsr BinToDec
+
+    lda #$00
+    sta $4016
+    lda #$02
+    sta $4016
+
+    lda #$00
+    sta AddressPointer3+0
+    sta AddressPointer3+1
+
+    ;jsr ResetAddr
+    ;macDrawText text_Writing, $20E5
+    ;jsr WaitForNMI
+
+    ldx #0
+:
+    lda text_Writing, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    lda #.lobyte(PatternNMI)
+    sta nmi_custom+0
+    lda #.hibyte(PatternNMI)
+    sta nmi_custom+1
+
+    lda #NMI_Action::Pointer
+    sta NMIAction
+
+    jsr WaitForNMI
+
+@writeAA:
+    lda #$AA
+    jsr WriteByte
+
+    inc AddressPointer3+0
+    bne :+
+    inc AddressPointer3+1
+:
+
+    lda AddressPointer3+1
+    cmp #$20
+    bne @writeAA
+    lda AddressPointer3+0
+    bne @writeAA
+
+
+    lda #$00
+    sta $4016
+    lda #$02
+    sta $4016
+
+    lda #$00
+    sta AddressPointer3+0
+    sta AddressPointer3+1
+    ;jsr ResetAddr
+    jsr ReadByte ; read past first address
+    inc AddressPointer3+0
+
+    ldx #0
+:
+    lda text_Reading, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    lda #0
+    sta ReadErrors+0
+    sta ReadErrors+1
+@readAA:
+    jsr ReadByte
+    cmp #$AA
+    beq :+
+    jsr IncError
+:
+
+    inc AddressPointer3+0
+    bne :+
+    inc AddressPointer3+1
+:
+
+    lda AddressPointer3+1
+    cmp #$20
+    bne @readAA
+    lda AddressPointer3+0
+    bne @readAA
+
+    ldx #0
+:
+    lda text_Done, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    ldx #0
+:
+    lda text_Writing, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    lda #$FF
+    sta NextPattern
+
+    lda #$00
+    sta $4016
+    lda #$02
+    sta $4016
+
+    lda #$00
+    sta AddressPointer3+0
+    sta AddressPointer3+1
+
+@write55:
+    lda #$55
+    jsr WriteByte
+
+    inc AddressPointer3+0
+    bne :+
+    inc AddressPointer3+1
+:
+
+    lda AddressPointer3+1
+    cmp #$20
+    bne @write55
+    lda AddressPointer3+0
+    bne @write55
+
+
+    lda #$00
+    sta $4016
+    lda #$02
+    sta $4016
+
+    lda #$00
+    sta AddressPointer3+0
+    sta AddressPointer3+1
+    ;jsr ResetAddr
+    jsr ReadByte ; read past first address
+    inc AddressPointer3+0
+
+    ldx #0
+:
+    lda text_Reading, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    ;lda #0
+    ;sta ReadErrors+0
+    ;sta ReadErrors+1
+@read55:
+    jsr ReadByte
+    cmp #$55
+    beq :+
+    jsr IncError
+:
+
+    inc AddressPointer3+0
+    bne :+
+    inc AddressPointer3+1
+:
+
+    lda AddressPointer3+1
+    cmp #$20
+    bne @read55
+    lda AddressPointer3+0
+    bne @read55
+
+    ldx #0
+:
+    lda text_Done, x
+    beq :+
+    sta StateText, x
+    inx
+    jmp :-
+:
+
+    jsr WaitForNMI
+
+    lda NMI_Action::Nothing
+    sta NMIAction
+    jsr WaitForNMI
+    rts
+
+IncError:
+    inc ReadErrors+0
+    bne :+
+    inc ReadErrors+1
+:
+
+    lda ReadErrors+0
+    sta Bin_Input+0
+    lda ReadErrors+1
+    sta Bin_Input+1
+    lda #0
+    sta Bin_Input+2
+    jsr BinToDec
+
+    rts
+
+PatternNMI:
+    lda NextPattern
+    bpl @skipTitle
+    lda #0
+    sta NextPattern
+
+    lda #.hibyte(patternAddr_Title)
+    sta $2006
+    lda #.lobyte(patternAddr_Title)
+    sta $2006
+
+    ldx #0
+:
+    lda text_Pattern55, x
+    beq :+
+    sta $2007
+    inx
+    jmp :-
+:
+
+@skipTitle:
+
+    lda #.hibyte(patternAddr_State)
+    sta $2006
+    lda #.lobyte(patternAddr_State)
+    sta $2006
+
+    ldx #0
+:
+    lda StateText, x
+    sta $2007
+    inx
+    cpx #10
+    bne :-
+
+    lda #' '
+    sta $2007
+    lda #'$'
+    sta $2007
+
+    lda AddressPointer3+1
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda HexAscii, x
+    sta $2007
+
+    lda AddressPointer3+1
+    and #$0F
+    tax
+    lda HexAscii, x
+    sta $2007
+
+    lda AddressPointer3+0
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda HexAscii, x
+    sta $2007
+
+    lda AddressPointer3+0
+    and #$0F
+    tax
+    lda HexAscii, x
+    sta $2007
+
+    lda #.hibyte(patternAddr_Errors)
+    sta $2006
+    lda #.lobyte(patternAddr_Errors)
+    sta $2006
+
+    ldx #0
+:
+    lda text_Errors, x
+    beq :+
+    inx
+    sta $2007
+    jmp :-
+:
+
+    ldx #0
+:
+    lda Bin_Tiles, x
+    sta $2007
+    inx
+    cpx #.sizeof(::Bin_Tiles)
+    bne :-
+
+    rts
 
 ResetAddr:
     lda #$00
@@ -520,6 +857,26 @@ text_Ok:
     .asciiz "Checksum OK"
 text_NotOk:
     .asciiz "Checksum FAILED"
+
+text_PatternAA:
+    .asciiz "Pattern test AA"
+text_Pattern55:
+    .asciiz "Pattern test 55"
+text_Writing:
+    .asciiz "Writing..."
+text_Reading:
+    .asciiz "Reading..."
+text_Done:
+    .asciiz "Done      "
+text_Blank:
+    .asciiz "    "
+text_Errors:
+    .asciiz "Errors: "
+
+patternAddr_Title   = $2065
+patternAddr_State   = patternAddr_Title + 32
+patternAddr_Address = patternAddr_State + 11
+patternAddr_Errors  = patternAddr_Title + 64
 
 Attr_None:
     .byte $FF
